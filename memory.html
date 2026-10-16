@@ -5,10 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>짝맞추기 메모리 AI 대결 — ZCode 데모</title>
 <style>
-  :root { --bg:#1b1e2b; --panel:#262a3d; --text:#e8eaf2; --sub:#9aa1b5; --accent:#7c8cf8;
+@font-face{font-family:'DungGeunMo';src:url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.3.0/DungGeunMo.woff') format('woff');font-display:swap;}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:90;background:repeating-linear-gradient(0deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px);}
+
+  :root { --bg:#070714; --panel:#12122e; --text:#f4f4ff; --sub:#8e8ec9; --accent:#ff2e88;
     --human:#4fd08a; --ai:#e0645c; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+  body { font-family:'DungGeunMo','Apple SD Gothic Neo',monospace;
     background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
     color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
   .app { width:820px; }
