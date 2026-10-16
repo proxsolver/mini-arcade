@@ -57,6 +57,9 @@
   #crosshair::after { left:0; top:8px; width:18px; height:2px; }
   #coords { font-family:'Orbitron',sans-serif; font-size:11px; color:var(--sub);
     background:rgba(7,7,20,.6); padding:4px 10px; border:1px solid #2a2a5a; }
+  #toast { position:fixed; top:56px; left:50%; transform:translateX(-50%); z-index:15;
+    background:rgba(18,18,46,.92); border:2px solid #2a2a5a; border-left:6px solid var(--gold);
+    color:var(--text); font-size:13.5px; padding:10px 18px; display:none; }
   #hotbar { display:flex; gap:4px; background:rgba(7,7,20,.7); padding:6px; border:2px solid #2a2a5a; }
   .slot { width:44px; height:44px; border:2px solid #454c68; position:relative;
     display:flex; align-items:center; justify-content:center; }
@@ -91,6 +94,8 @@
   </span>
 </div>
 
+<div id="toast"></div>
+
 <div id="overlay">
   <h1>MiniCraft</h1>
   <section class="intro">
@@ -121,7 +126,8 @@
     · <kbd>1~8</kbd> 또는 <kbd>휠</kbd>로 잔디·흙·돌·나무·잎·유리·벽돌·금 중 선택.<br>
     · <kbd>F</kbd> 날기 모드 — 중력 없이 <kbd>SPACE</kbd> 상승, <kbd>CTRL</kbd> 하강.<br>
     · <kbd>ESC</kbd> 커서 풀기 (일시정지). 다시 클릭하면 이어서 플레이.<br>
-    · 나무를 잘라 언덕에 집을 짓든, 금 블록 피라미드를 세우든 자유입니다. 세계는 새로고침 시 초기화됩니다.<br><br>
+    · 나무를 잘라 언덕에 집을 짓든, 금 블록 피라미드를 세우든 자유입니다. 세계는 새로고침 시 초기화됩니다.<br>
+    · 맨 아래 <b>기반암</b>은 부술 수 없습니다 — 아무리 파도 세계 밖으로 추락하지 않아요.<br><br>
     💡 물리 엔진이 있어 언덕에서 떨어지면 착지합니다. 발밑을 파면 당연히 묻힉니다.
   </div>
 </div>
@@ -142,6 +148,7 @@ const TYPES = {
   6: { name: '유리', color: '#9fd8e8', vary: 10, opacity: 0.55 },
   7: { name: '벽돌', color: '#b5503c', vary: 16 },
   8: { name: '금',   color: '#e8c14a', vary: 12 },
+  9: { name: '기반암', color: '#3a3a44', vary: 8, unbreakable: true },
 };
 const HOTBAR = [1, 2, 3, 4, 5, 6, 7, 8];
 let sel = 0;
@@ -196,8 +203,9 @@ function height(x, z) {
   for (let x = 0; x < SX; x++) for (let z = 0; z < SZ; z++) {
     const h = height(x, z);
     world.set(key(x, h, z), 1);
-    for (let y = h - 1; y >= Math.max(0, h - 3); y--) world.set(key(x, y, z), 2);
-    for (let y = h - 4; y >= 0; y--) world.set(key(x, y, z), 3);
+    for (let y = h - 1; y >= Math.max(1, h - 3); y--) world.set(key(x, y, z), 2);
+    for (let y = h - 4; y >= 1; y--) world.set(key(x, y, z), 3);
+    world.set(key(x, 0, z), 9); // 기반암 — 세계의 바닥
   }
   // 나무
   for (let i = 0; i < 26; i++) {
@@ -251,7 +259,7 @@ function rebuild() {
     im.instanceMatrix.needsUpdate = true;
     exposedCount += n;
   }
-  window.__mcStats = { blocks: world.size, exposed: exposedCount };
+  window.__mcStats = { blocks: world.size, exposed: exposedCount, bedrock: world.get(key(SX >> 1, 0, SZ >> 1)) };
 }
 rebuild();
 
@@ -335,6 +343,8 @@ addEventListener('mousedown', e => {
   const hit = raycast(camera.position, dir, 6);
   if (!hit) return;
   if (e.button === 0) { // 파괴
+    const t = world.get(key(hit.x, hit.y, hit.z));
+    if (t && TYPES[t].unbreakable) { showToast('⛏ 기반암은 부술 수 없습니다 — 세계의 바닥이에요'); return; }
     world.delete(key(hit.x, hit.y, hit.z));
     rebuild();
   } else if (e.button === 2) { // 설치
@@ -349,6 +359,14 @@ addEventListener('mousedown', e => {
 });
 
 // ─── 핫바 UI ───────────────────────────────────────────
+const toastEl = document.getElementById('toast');
+let toastTimer = null;
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.style.display = 'block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastEl.style.display = 'none', 2200);
+}
 const hotbarEl = document.getElementById('hotbar');
 const swatches = {};
 for (const [id, t] of Object.entries(TYPES)) {
@@ -412,7 +430,11 @@ function loop() {
     if (P.vel.y < 0) P.onGround = true;
     P.vel.y = 0;
   }
-  if (P.pos.y < -12) { P.pos.set(SX / 2 + 0.5, height(SX / 2, SZ / 2) + 3, SZ / 2 + 0.5); P.vel.set(0, 0, 0); }
+  if (P.pos.y < -12) {
+    P.pos.set(SX / 2 + 0.5, height(SX / 2, SZ / 2) + 3, SZ / 2 + 0.5);
+    P.vel.set(0, 0, 0);
+    showToast('💫 추락했습니다 — 스폰 지점으로 돌아왔습니다');
+  }
 
   // 카메라
   camera.position.set(P.pos.x, P.pos.y + P.EYE, P.pos.z);
