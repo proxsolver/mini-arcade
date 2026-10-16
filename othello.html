@@ -81,6 +81,20 @@ h1,h2,h3,.cpu,.tab,.sw,th{font-family:'Orbitron','Pretendard','Apple SD Gothic N
   .back { margin-top:10px; text-align:center; }
   .back a { color:var(--sub); font-size:13px; text-decoration:none; border-bottom:1px solid #454c68; }
   footer { margin-top:8px; color:var(--sub); font-size:11px; text-align:center; }
+
+@media (max-width: 760px) {
+  .app { width: 100%; }
+  header h1 { font-size: 20px; }
+  .arena { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .board-wrap { grid-column: 1 / -1; order: -1; justify-self: center; }
+  .player-card { width: auto; padding: 10px 6px; }
+  .player-card .spec { min-height: 0; }
+  #board { grid-template-columns: repeat(8, min(10.5vw, 54px)); gap: 3px; padding: 6px; }
+  .sq { width: 100%; aspect-ratio: 1; height: auto; }
+  .sq .disc { inset: 12%; }
+  .sq .dot { inset: 36%; }
+  .intro { max-width: 100%; }
+}
 </style>
 </head>
 <body>

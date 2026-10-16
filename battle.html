@@ -73,6 +73,16 @@ h1,h2,h3,.cpu,.tab,.sw,th{font-family:'Orbitron','Pretendard','Apple SD Gothic N
   .modal-box .close { float:right; background:#3a4060; border-radius:8px; padding:6px 12px; cursor:pointer;
     color:var(--text); font-size:13px; }
   footer { margin-top:10px; color:var(--sub); font-size:11px; text-align:center; }
+
+@media (max-width: 760px) {
+  .app { width: 100%; }
+  header h1 { font-size: 20px; }
+  .arena { flex-direction: column; align-items: center; gap: 8px; margin-top: 10px; }
+  .side { max-width: min(92vw, 330px); width: 100%; }
+  .mid { font-size: 18px; margin: 0; }
+  .cell { font-size: min(8vw, 34px); }
+  .intro { max-width: 100%; }
+}
 </style>
 </head>
 <body>

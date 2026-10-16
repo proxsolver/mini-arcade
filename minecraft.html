@@ -67,7 +67,29 @@
   .slot .sw { width:28px; height:28px; image-rendering:pixelated; border:1px solid rgba(0,0,0,.4); }
   .slot .num { position:absolute; top:1px; left:3px; font-size:9px; color:var(--sub); font-family:'Orbitron',sans-serif; }
 
-  /* 규칙 모달 */
+  /* 규칙 모달 (위 styles 계속) */
+  /* 터치 컨트롤 */
+  #touch { display: none; }
+  body.touch #touch { display: block; }
+  #stick { position: fixed; left: 22px; bottom: 26px; z-index: 14; width: 120px; height: 120px;
+    border-radius: 50%; background: rgba(18,18,46,.4); border: 2px solid rgba(142,142,201,.5);
+    touch-action: none; }
+  #knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; border-radius: 50%;
+    background: rgba(142,142,201,.55); border: 2px solid rgba(244,244,255,.5);
+    transform: translate(-50%, -50%); }
+  #tbtns { position: fixed; right: 18px; bottom: 22px; z-index: 14; display: grid;
+    grid-template-columns: repeat(2, 60px); gap: 10px; touch-action: none; }
+  #tbtns button { width: 60px; height: 60px; border-radius: 50%; border: 2px solid #2a2a5a;
+    background: rgba(18,18,46,.55); color: #f4f4ff; font-size: 24px; cursor: pointer; }
+  #tbtns button:active { background: rgba(63,211,95,.4); }
+  #tb-down { display: none; }
+  body.touch.flying #tb-down { display: block; }
+  @media (max-width: 760px) {
+    .topbar .title { font-size: 12px; }
+    .topbar .links { font-size: 11px; }
+    #overlay h1 { font-size: 30px; }
+    #overlay .keys { font-size: 12px; }
+  }
   .modal { position:fixed; inset:0; background:rgba(4,4,12,.82); display:none;
     align-items:center; justify-content:center; z-index:95; padding:24px; }
   .modal.open { display:flex; }
@@ -115,6 +137,17 @@
 <div id="hud">
   <div id="coords">XYZ 0 / 0 / 0</div>
   <div id="hotbar"></div>
+</div>
+
+<div id="touch">
+  <div id="stick"><div id="knob"></div></div>
+  <div id="tbtns">
+    <button id="tb-jump" aria-label="점프">⤒</button>
+    <button id="tb-mine" aria-label="파괴">⛏</button>
+    <button id="tb-fly" aria-label="비행">✈</button>
+    <button id="tb-place" aria-label="설치">🧱</button>
+    <button id="tb-down" aria-label="하강">⤓</button>
+  </div>
 </div>
 
 <div class="modal" id="ruleModal">
@@ -321,8 +354,7 @@ const overlay = document.getElementById('overlay');
 const hud = document.getElementById('hud');
 const cross = document.getElementById('crosshair');
 let playing = false;
-overlay.addEventListener('click', () => renderer.domElement.requestPointerLock());
-renderer.domElement.addEventListener('click', () => { if (!playing) renderer.domElement.requestPointerLock(); });
+renderer.domElement.addEventListener('click', () => { if (!playing && !isTouch) renderer.domElement.requestPointerLock(); });
 document.addEventListener('pointerlockchange', () => {
   playing = document.pointerLockElement === renderer.domElement;
   overlay.style.display = playing ? 'none' : 'flex';
@@ -337,25 +369,127 @@ addEventListener('mousemove', e => {
 });
 addEventListener('contextmenu', e => e.preventDefault());
 let mouseDownAt = 0;
-addEventListener('mousedown', e => {
-  if (!playing) return;
+function doBreak() {
   const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
   const hit = raycast(camera.position, dir, 6);
   if (!hit) return;
-  if (e.button === 0) { // 파괴
-    const t = world.get(key(hit.x, hit.y, hit.z));
-    if (t && TYPES[t].unbreakable) { showToast('⛏ 기반암은 부술 수 없습니다 — 세계의 바닥이에요'); return; }
-    world.delete(key(hit.x, hit.y, hit.z));
-    rebuild();
-  } else if (e.button === 2) { // 설치
-    const nx = hit.x + hit.nx, ny = hit.y + hit.ny, nz = hit.z + hit.nz;
-    if (!world.has(key(nx, ny, nz))) {
-      const bx = nx + 0.5, by = ny + 0.5, bz = nz + 0.5;
-      const inPlayer = Math.abs(bx - P.pos.x) < 0.5 + P.W && Math.abs(bz - P.pos.z) < 0.5 + P.W &&
-                       by > P.pos.y - 0.5 && by < P.pos.y + P.H + 0.5;
-      if (!inPlayer) { world.set(key(nx, ny, nz), HOTBAR[sel]); rebuild(); }
-    }
+  const t = world.get(key(hit.x, hit.y, hit.z));
+  if (t && TYPES[t].unbreakable) { showToast('⛏ 기반암은 부술 수 없습니다 — 세계의 바닥이에요'); return; }
+  world.delete(key(hit.x, hit.y, hit.z));
+  rebuild();
+}
+function doPlace() {
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+  const hit = raycast(camera.position, dir, 6);
+  if (!hit) return;
+  const nx = hit.x + hit.nx, ny = hit.y + hit.ny, nz = hit.z + hit.nz;
+  if (!world.has(key(nx, ny, nz))) {
+    const bx = nx + 0.5, by = ny + 0.5, bz = nz + 0.5;
+    const inPlayer = Math.abs(bx - P.pos.x) < 0.5 + P.W && Math.abs(bz - P.pos.z) < 0.5 + P.W &&
+                     by > P.pos.y - 0.5 && by < P.pos.y + P.H + 0.5;
+    if (!inPlayer) { world.set(key(nx, ny, nz), HOTBAR[sel]); rebuild(); }
   }
+}
+addEventListener('mousedown', e => {
+  if (!playing) return;
+  if (e.button === 0) doBreak();
+  else if (e.button === 2) doPlace();
+});
+
+// ─── 터치 컨트롤 (모바일) ───────────────────────────────
+const isTouch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
+const touchMove = { fw: 0, st: 0 };
+let touchJump = false, touchDown = false;
+
+if (isTouch) {
+  document.body.classList.add('touch');
+  document.querySelector('#overlay .start').textContent = '▼ 탭해서 게임 시작 ▼';
+  document.querySelector('#overlay .keys').innerHTML =
+    '<b>왼쪽 조이스틱</b> 이동 · <b>화면 드래그</b> 시선<br><b>⛏</b> 파괴 · <b>🧱</b> 설치 · <b>⤒</b> 점프 · <b>✈</b> 날기';
+}
+
+// 오버레이: 터치 기기는 포인터 락 없이 바로 시작
+overlay.addEventListener('click', () => {
+  if (isTouch) {
+    playing = true;
+    overlay.style.display = 'none';
+    hud.style.display = 'flex';
+    cross.style.display = 'block';
+  } else {
+    renderer.domElement.requestPointerLock();
+  }
+});
+
+// 조이스틱
+const stick = document.getElementById('stick');
+const knob = document.getElementById('knob');
+let stickId = null;
+stick.addEventListener('touchstart', e => {
+  e.preventDefault();
+  stickId = e.changedTouches[0].identifier;
+}, { passive: false });
+stick.addEventListener('touchmove', e => {
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier !== stickId) continue;
+    const r = stick.getBoundingClientRect();
+    let dx = t.clientX - (r.left + r.width / 2), dy = t.clientY - (r.top + r.height / 2);
+    const len = Math.hypot(dx, dy), max = r.width / 2;
+    if (len > max) { dx = dx / len * max; dy = dy / len * max; }
+    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    touchMove.st = dx / max;
+    touchMove.fw = -dy / max;
+  }
+}, { passive: false });
+const stickEnd = e => {
+  for (const t of e.changedTouches) {
+    if (t.identifier !== stickId) continue;
+    stickId = null;
+    knob.style.transform = 'translate(-50%, -50%)';
+    touchMove.fw = 0; touchMove.st = 0;
+  }
+};
+stick.addEventListener('touchend', stickEnd);
+stick.addEventListener('touchcancel', stickEnd);
+
+// 시선 드래그 (캔버스 = 조이스틱·버튼 외 영역)
+let lookId = null, lookX = 0, lookY = 0;
+renderer.domElement.addEventListener('touchstart', e => {
+  if (lookId === null && e.changedTouches.length) {
+    lookId = e.changedTouches[0].identifier;
+    lookX = e.changedTouches[0].clientX;
+    lookY = e.changedTouches[0].clientY;
+  }
+}, { passive: true });
+renderer.domElement.addEventListener('touchmove', e => {
+  for (const t of e.changedTouches) {
+    if (t.identifier !== lookId) continue;
+    P.yaw -= (t.clientX - lookX) * 0.005;
+    P.pitch -= (t.clientY - lookY) * 0.005;
+    P.pitch = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, P.pitch));
+    lookX = t.clientX; lookY = t.clientY;
+  }
+}, { passive: true });
+const lookEnd = e => {
+  for (const t of e.changedTouches) if (t.identifier === lookId) lookId = null;
+};
+renderer.domElement.addEventListener('touchend', lookEnd);
+renderer.domElement.addEventListener('touchcancel', lookEnd);
+
+// 액션 버튼
+const bind = (id, down, up) => {
+  const el = document.getElementById(id);
+  el.addEventListener('touchstart', e => { e.preventDefault(); down(); }, { passive: false });
+  if (up) el.addEventListener('touchend', e => { e.preventDefault(); up(); }, { passive: false });
+};
+bind('tb-mine', () => doBreak());
+bind('tb-place', () => doPlace());
+bind('tb-jump', () => touchJump = true, () => touchJump = false);
+bind('tb-down', () => touchDown = true, () => touchDown = false);
+bind('tb-fly', () => {
+  P.fly = !P.fly; P.vel.y = 0;
+  document.body.classList.toggle('flying', P.fly);
+  setCoords();
 });
 
 // ─── 핫바 UI ───────────────────────────────────────────
@@ -402,21 +536,23 @@ function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(clock.getDelta(), 0.05);
 
-  // 이동
-  const fw = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
-  const st = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+  // 이동 (키보드 + 터치 병행)
+  const fw = Math.max(-1, Math.min(1, (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) + touchMove.fw));
+  const st = Math.max(-1, Math.min(1, (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + touchMove.st));
+  const jumpHeld = keys.Space || touchJump;
+  const downHeld = keys.ControlLeft || keys.ControlRight || touchDown;
   const sp = (keys.ShiftLeft || keys.ShiftRight ? 7.5 : 4.3) * (P.fly ? 1.6 : 1);
   const sin = Math.sin(P.yaw), cos = Math.cos(P.yaw);
   const vx = (st * cos - fw * sin) * sp;
   const vz = (-fw * cos - st * sin) * sp;
   if (P.fly) {
-    const vy = (keys.Space ? 6 : 0) - (keys.ControlLeft || keys.ControlRight ? 6 : 0);
+    const vy = (jumpHeld ? 6 : 0) - (downHeld ? 6 : 0);
     P.vel.set(vx, vy, vz);
   } else {
     P.vel.x = vx; P.vel.z = vz;
     P.vel.y -= 24 * dt;
     if (P.vel.y < -40) P.vel.y = -40;
-    if (keys.Space && P.onGround) { P.vel.y = 8.2; P.onGround = false; }
+    if (jumpHeld && P.onGround) { P.vel.y = 8.2; P.onGround = false; }
   }
 
   // 축별 이동 + 충돌
