@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>사목(Connect Four) AI 대결 — ZCode 데모</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --cellbg:#1f2333; --text:#e8eaf2; --sub:#9aa1b5;
+    --accent:#7c8cf8; --human:#f2c94c; --ai:#e0645c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .app { width:760px; }
+  header { text-align:center; margin-bottom:8px; }
+  header h1 { font-size:28px; }
+  header h1 .ai { color:var(--ai); }
+  header h1 .hu { color:var(--human); }
+  header h1 .vs { font-size:18px; color:var(--sub); margin:0 8px; }
+  .rules { color:var(--sub); font-size:13px; margin-top:6px; }
+  .rules b { color:var(--text); }
+  .arena { display:flex; gap:14px; justify-content:center; align-items:flex-start; margin-top:14px; }
+  .player-card { width:150px; background:var(--panel); border-radius:14px; padding:14px 12px; text-align:center; }
+  .player-card .tag { font-size:16px; font-weight:800; }
+  #aiCard .tag { color:var(--ai); }
+  #huCard .tag { color:var(--human); }
+  .player-card .spec { font-size:11px; color:var(--sub); margin-top:4px; font-family:'Consolas','Courier New',monospace; min-height:14px; }
+  .player-card .wins { margin-top:10px; font-size:13px; color:var(--sub); }
+  .player-card .wins b { display:block; font-size:26px; color:var(--text); }
+  .turn-dot { width:34px; height:34px; border-radius:50%; margin:10px auto 0; background:var(--cellbg); opacity:.35; }
+  #aiCard .turn-dot.active { background:var(--ai); opacity:1; box-shadow:0 0 14px var(--ai); }
+  #huCard .turn-dot.active { background:var(--human); opacity:1; box-shadow:0 0 14px var(--human); }
+  .board-wrap { position:relative; }
+  #board { display:grid; grid-template-columns:repeat(7, 60px); gap:6px; background:#2a3350;
+    padding:10px; border-radius:14px; }
+  .hole { width:60px; height:60px; border-radius:50%; background:var(--cellbg); cursor:pointer; position:relative; }
+  .hole:hover:not(.taken) { background:#2c3550; box-shadow:inset 0 0 0 3px var(--accent); }
+  .hole.ai { background:var(--ai); animation:pop .18s ease-out; cursor:default; }
+  .hole.hu { background:var(--human); animation:pop .18s ease-out; cursor:default; }
+  .hole.win { box-shadow:0 0 0 4px #ffd24d, 0 0 18px #ffd24d; }
+  .hole.taken { cursor:default; }
+  @keyframes pop { from { transform:scale(.5); } to { transform:scale(1); } }
+  .overlay { position:absolute; inset:0; background:rgba(18,20,32,.86); display:none; align-items:center;
+    justify-content:center; border-radius:14px; font-size:28px; font-weight:900; z-index:5; text-align:center; line-height:1.5; }
+  .overlay.win { display:flex; color:#ffd24d; }
+  .overlay.lose { display:flex; color:#8b93a8; }
+  .overlay.draw { display:flex; color:var(--sub); }
+  .controls { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+  button { border:0; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; }
+  #newMatch { background:#3a4060; }
+  .cpu { font-family:'Consolas','Courier New',monospace; background:#2c3145; border:1px solid #454c68;
+    padding:8px 12px; font-size:13px; line-height:1.2; text-align:left; }
+  .cpu small { display:block; font-size:10px; opacity:.65; font-weight:400; }
+  .cpu.active { background:var(--accent); border-color:var(--accent); }
+  .cpu-label { color:var(--sub); font-size:13px; }
+  .status { margin-top:12px; text-align:center; font-size:15px; color:var(--sub); min-height:22px; }
+  .status b { color:var(--text); }
+  #ruleBtn { background:#3a4060; }
+  .modal { position:fixed; inset:0; background:rgba(12,14,22,.78); display:none;
+    align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .modal.open { display:flex; }
+  .modal-box { background:var(--panel); border:1px solid #454c68; border-radius:18px; max-width:560px;
+    width:100%; max-height:86vh; overflow-y:auto; padding:24px 26px; font-size:14.5px; line-height:1.65; color:var(--sub); }
+  .modal-box h3 { font-size:19px; color:var(--text); margin-bottom:10px; }
+  .modal-box b { color:var(--accent); }
+  .modal-box .close { float:right; background:#3a4060; border-radius:8px; padding:6px 12px; cursor:pointer;
+    color:var(--text); font-size:13px; }
+  footer { margin-top:10px; color:var(--sub); font-size:11px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="ai">🤖 AI</span><span class="vs">VS</span><span class="hu">🧑 나</span> <span style="font-size:20px;color:var(--sub)">— 사목(Connect Four)</span></h1>
+    <p class="rules">7×6 판에 돌을 떨어뜨려 <b>가로·세로·대각선 4개</b>를 먼저 완성하면 승리 · 당신이 <b>선공</b> · 열을 클릭하거나 <b>숫자키 1~7</b></p>
+  </header>
+
+  <div class="arena">
+    <div class="player-card" id="aiCard">
+      <div class="tag">🤖 <span id="cpuName">📱 옴니아</span></div>
+      <div class="spec" id="cpuSpec">2008 624MHz · 깊이 4</div>
+      <div class="wins">AI 승리<b id="aiWins">0</b></div>
+      <div class="turn-dot" id="aiDot"></div>
+    </div>
+
+    <div class="board-wrap">
+      <div id="board"></div>
+      <div class="overlay" id="overlay"></div>
+    </div>
+
+    <div class="player-card" id="huCard">
+      <div class="tag">🧑 나</div>
+      <div class="spec">생물학적 뉴런 860억 개</div>
+      <div class="wins">내 승리<b id="huWins">0</b></div>
+      <div class="turn-dot active" id="huDot"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="newMatch">🔄 새 대국</button>
+    <button id="ruleBtn">📖 규칙</button>
+    <span class="cpu-label">AI CPU:</span>
+    <button class="cpu" data-cpu="mw">🍲 전자레인지<small>700W · 깊이 0</small></button>
+    <button class="cpu" data-cpu="ph">📱 피처폰<small>ARM9 · 깊이 1</small></button>
+    <button class="cpu" data-cpu="tv">📺 스마트TV<small>듀얼코어 · 깊이 2</small></button>
+    <button class="cpu active" data-cpu="om">📱 옴니아<small>624MHz · 깊이 4</small></button>
+    <button class="cpu" data-cpu="gs">📱 아이폰3GS<small>Cortex-A8 · 깊이 6</small></button>
+    <button class="cpu" data-cpu="m4">🧠 M4 Max<small>2026 · 깊이 8</small></button>
+  </div>
+  <div class="status" id="status">당신 차례 — 열을 클릭하거나 숫자키 1~7로 돌을 놓으세요</div>
+  <div style="margin-top:10px;text-align:center"><a href="index.html" style="color:var(--sub);font-size:13px;text-decoration:none;border-bottom:1px solid #454c68">← 게임 로비로</a></div>
+  <footer>미니맥스 + 알파베타 가지치기 · CPU 등급 = 탐색 깊이 · vanilla JS 단일 파일 — 생성·실행·검증 ZCode</footer>
+
+  <div class="modal" id="ruleModal">
+    <div class="modal-box">
+      <button class="close" id="ruleClose">닫기 ✕</button>
+      <h3>🔴 사목 Connect Four — 규칙</h3>
+      · 7×6 판에 돌을 떨어뜨려 <b>가로·세로·대각선으로 4개</b>를 먼저 연결하면 승리합니다.<br>
+      · 당신(<b style="color:#f2c94c">● 노랑</b>)이 <b>선공</b>, AI(<b style="color:#e0645c">● 빨강</b>)이 후공입니다.<br>
+      · <b>열 클릭</b> 또는 <b>숫자키 1~7</b>로 둘 수 있고, 돌은 해당 열의 가장 아래 빈 칸으로 떨어집니다.<br>
+      · 판이 가득 차면 <b>무승부</b>. 승부가 결정되면 연결된 4개 돌이 <b>금색으로 하이라이트</b>되고 전적이 좌우 카드에 누적됩니다.<br>
+      · CPU 등급 = 미니맥스 알파베타 탐색이 <b>앞으로 읽는 수(깊이 0~8)</b>. Pentium 이상은 당신의 다음 수까지 계산해 미리 차단합니다.<br><br>
+      💡 <b>전략</b>: <b>중앙 열(4번)</b>이 모든 방향에 닿는 최고의 자리입니다. "이기는 수"와 "막는 수"를 동시에 만드는 <b>더블 위협</b>을 노리세요.
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── 보드 기본 ──────────────────────────────────────────
+const ROWS = 6, COLS = 7;          // grid[r][c], r=0이 최상단
+const AI = 1, HU = 2;
+const boardWrap = document.querySelector('.board-wrap');
+const boardEl = document.getElementById('board');
+const overlay = document.getElementById('overlay');
+const statusEl = document.getElementById('status');
+const aiDot = document.getElementById('aiDot'), huDot = document.getElementById('huDot');
+const aiWinsEl = document.getElementById('aiWins'), huWinsEl = document.getElementById('huWins');
+const holes = [];
+for (let i = 0; i < ROWS * COLS; i++) {
+  const d = document.createElement('div');
+  d.className = 'hole';
+  d.addEventListener('click', () => humanClick(i % COLS));
+  boardEl.appendChild(d);
+  holes.push(d);
+}
+
+let grid, turn, locked, matchOver;
+let aiWins = 0, huWins = 0;
+
+const newBoard = () => Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+function dropRow(g, c) { for (let r = ROWS - 1; r >= 0; r--) if (!g[r][c]) return r; return -1; }
+function validCols(g) { const v = []; for (let c = 0; c < COLS; c++) if (!g[0][c]) v.push(c); return v; }
+function isFull(g) { return validCols(g).length === 0; }
+
+// 4개 라인이 완성되면 그 좌표들을 반환 (하이라이트용), 아니면 null
+function winLine(g, p) {
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    if (g[r][c] !== p) continue;
+    for (const [dr, dc] of dirs) {
+      const cells = [[r, c]];
+      for (let k = 1; k < 4; k++) {
+        const rr = r + dr * k, cc = c + dc * k;
+        if (rr < 0 || rr >= ROWS || cc < 0 || cc >= COLS || g[rr][cc] !== p) break;
+        cells.push([rr, cc]);
+      }
+      if (cells.length === 4) return cells;
+    }
+  }
+  return null;
+}
+
+// ─── 평가 & 미니맥스 ────────────────────────────────────
+function windowScore(w) {
+  let ai = 0, hu = 0;
+  for (const v of w) { if (v === AI) ai++; else if (v === HU) hu++; }
+  const e = 4 - ai - hu;
+  if (ai && hu) return 0;
+  if (ai === 3 && e === 1) return 60;
+  if (ai === 2 && e === 2) return 10;
+  if (hu === 3 && e === 1) return -80;
+  if (hu === 2 && e === 2) return -10;
+  return 0;
+}
+function evalBoard(g) {
+  let s = 0;
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS - 3; c++)
+    s += windowScore([g[r][c], g[r][c+1], g[r][c+2], g[r][c+3]]);
+  for (let c = 0; c < COLS; c++) for (let r = 0; r < ROWS - 3; r++)
+    s += windowScore([g[r][c], g[r+1][c], g[r+2][c], g[r+3][c]]);
+  for (let r = 0; r < ROWS - 3; r++) for (let c = 0; c < COLS - 3; c++)
+    s += windowScore([g[r][c], g[r+1][c+1], g[r+2][c+2], g[r+3][c+3]]);
+  for (let r = 3; r < ROWS; r++) for (let c = 0; c < COLS - 3; c++)
+    s += windowScore([g[r][c], g[r-1][c+1], g[r-2][c+2], g[r-3][c+3]]);
+  for (let r = 0; r < ROWS; r++) if (g[r][3] === AI) s += 6;
+  return s;
+}
+const ORDER = [3, 2, 4, 1, 5, 0, 6];
+function minimax(g, depth, alpha, beta, maximizing) {
+  if (winLine(g, AI)) return 1000000 - (8 - depth);
+  if (winLine(g, HU)) return -1000000 + (8 - depth);
+  const valid = validCols(g);
+  if (!valid.length) return 0;
+  if (depth === 0) return evalBoard(g);
+  const cols = ORDER.filter(c => valid.includes(c));
+  if (maximizing) {
+    let best = -Infinity;
+    for (const c of cols) {
+      const r = dropRow(g, c); g[r][c] = AI;
+      const v = minimax(g, depth - 1, alpha, beta, false);
+      g[r][c] = 0;
+      if (v > best) best = v;
+      if (alpha < v) alpha = v;
+      if (beta <= alpha) break;
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (const c of cols) {
+      const r = dropRow(g, c); g[r][c] = HU;
+      const v = minimax(g, depth - 1, alpha, beta, true);
+      g[r][c] = 0;
+      if (v < best) best = v;
+      if (beta > v) beta = v;
+      if (beta <= alpha) break;
+    }
+    return best;
+  }
+}
+function aiChoose(g, depth) {
+  const valid = validCols(g);
+  if (!valid.length) return -1;
+  if (depth <= 0) return valid[Math.floor(Math.random() * valid.length)];
+  let bestCol = valid[0], bestV = -Infinity, alpha = -Infinity;
+  for (const c of ORDER.filter(c => valid.includes(c))) {
+    const r = dropRow(g, c); g[r][c] = AI;
+    let v;
+    if (winLine(g, AI)) v = 1000000;
+    else v = minimax(g, depth - 1, alpha, Infinity, false);
+    g[r][c] = 0;
+    if (v > bestV) { bestV = v; bestCol = c; }
+    if (alpha < v) alpha = v;
+  }
+  return bestCol;
+}
+
+// ─── CPU 등급 ───────────────────────────────────────────
+const CPUS = {
+  mw: { name: '🍲 전자레인지',  spec: '700 W · 깊이 0 (무작위)', depth: 0 },
+  ph: { name: '📱 피처폰',     spec: '2005 ARM9 · 깊이 1', depth: 1 },
+  tv: { name: '📺 스마트 TV',  spec: '2010 듀얼코어 · 깊이 2', depth: 2 },
+  om: { name: '📱 옴니아',     spec: '2008 624MHz · 깊이 4', depth: 4 },
+  gs: { name: '📱 아이폰 3GS', spec: '2009 Cortex-A8 · 깊이 6', depth: 6 },
+  m4: { name: '🧠 M4 Max',     spec: '2026 풀가속 · 깊이 8',  depth: 8 },
+};
+let currentCpu = 'om';
+
+// ─── 진행 ───────────────────────────────────────────────
+function render() {
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    const el = holes[r * COLS + c];
+    const v = grid[r][c];
+    el.className = 'hole' + (v === AI ? ' ai' : v === HU ? ' hu' : '');
+  }
+}
+function setTurnDots() {
+  aiDot.className = 'turn-dot' + (turn === AI && !matchOver ? ' active' : '');
+  huDot.className = 'turn-dot' + (turn === HU && !matchOver ? ' active' : '');
+}
+function setStatus(html) { statusEl.innerHTML = html; }
+
+function endMatch(winner, line) {
+  matchOver = true; locked = true;
+  if (line) for (const [r, c] of line) holes[r * COLS + c].classList.add('win');
+  if (winner === 'draw') {
+    overlay.textContent = '🤝 무승부';
+    overlay.className = 'overlay draw';
+    setStatus('가득 찼지만 승부가 나지 않았습니다 — <b>무승부!</b>');
+  } else if (winner === AI) {
+    aiWins++; aiWinsEl.textContent = aiWins;
+    overlay.textContent = '🤖 AI 승리!';
+    overlay.className = 'overlay lose';
+    setStatus('<b>' + CPUS[currentCpu].name + ' 승리!</b> — CPU 등급을 낮추거나 새 대국으로 복수하세요');
+  } else {
+    huWins++; huWinsEl.textContent = huWins;
+    overlay.textContent = '🏆 승리!';
+    overlay.className = 'overlay win';
+    setStatus('<b>당신 승리!</b> ' + CPUS[currentCpu].name + '를 꺾었습니다!');
+  }
+  setTurnDots();
+}
+
+function afterMove(p) {
+  const line = winLine(grid, p);
+  if (line) { endMatch(p === AI ? 'ai' : 'hu', line); return true; }
+  if (isFull(grid)) { endMatch('draw'); return true; }
+  return false;
+}
+
+function aiTurn() {
+  if (matchOver) return;
+  turn = AI; setTurnDots(); locked = true;
+  setStatus('AI 생각 중… (' + CPUS[currentCpu].name + ', 깊이 ' + CPUS[currentCpu].depth + ')');
+  setTimeout(() => {
+    if (matchOver) return;
+    const c = aiChoose(grid, CPUS[currentCpu].depth);
+    if (c < 0) { endMatch('draw'); return; }
+    const r = dropRow(grid, c);
+    grid[r][c] = AI;
+    render();
+    if (afterMove(AI)) return;
+    turn = HU; setTurnDots(); locked = false;
+    setStatus('당신 차례 — 열을 클릭하거나 숫자키 1~7');
+  }, 250 + Math.random() * 350); // 생각하는 템
+}
+
+function humanClick(c) {
+  if (locked || matchOver || turn !== HU) return;
+  const r = dropRow(grid, c);
+  if (r < 0) { setStatus('그 열은 가득 찼습니다 — 다른 열을 선택하세요'); return; }
+  grid[r][c] = HU;
+  render();
+  if (afterMove(HU)) return;
+  aiTurn();
+}
+
+function newMatch() {
+  grid = newBoard();
+  turn = HU; locked = false; matchOver = false;
+  overlay.className = 'overlay'; overlay.textContent = '';
+  render();
+  setTurnDots();
+  setStatus('새 대국 (AI CPU: <b>' + CPUS[currentCpu].name + '</b>) — 당신 선공, 열을 클릭하세요');
+}
+
+document.querySelectorAll('.cpu').forEach(b =>
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.cpu').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    currentCpu = b.dataset.cpu;
+    document.getElementById('cpuName').textContent = CPUS[currentCpu].name;
+    document.getElementById('cpuSpec').textContent = CPUS[currentCpu].spec;
+    setStatus('AI CPU 교체: <b>' + CPUS[currentCpu].name + '</b> (' + CPUS[currentCpu].spec + ')');
+  }));
+document.getElementById('newMatch').addEventListener('click', newMatch);
+window.addEventListener('keydown', e => {
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= 7) humanClick(n - 1);
+});
+
+newMatch();
+</script>
+<script>
+// 규칙 모달
+const ruleModal = document.getElementById('ruleModal');
+document.getElementById('ruleBtn').addEventListener('click', () => ruleModal.classList.add('open'));
+document.getElementById('ruleClose').addEventListener('click', () => ruleModal.classList.remove('open'));
+ruleModal.addEventListener('click', e => { if (e.target === ruleModal) ruleModal.classList.remove('open'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') ruleModal.classList.remove('open'); });
+</script>
+</body>
+</html>

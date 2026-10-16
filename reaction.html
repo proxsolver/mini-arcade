@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>반응속도 대결 — ZCode 데모</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --text:#e8eaf2; --sub:#9aa1b5; --accent:#7c8cf8; --human:#4fd08a; --ai:#e0645c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .app { width:760px; }
+  header { text-align:center; margin-bottom:8px; }
+  header h1 { font-size:28px; }
+  header h1 .ai { color:var(--ai); } header h1 .hu { color:var(--human); }
+  header h1 .vs { font-size:18px; color:var(--sub); margin:0 8px; }
+  .rules { color:var(--sub); font-size:13px; margin-top:6px; }
+  .rules b { color:var(--text); }
+  .scoreboard { display:flex; justify-content:center; gap:60px; align-items:center; margin-top:16px; }
+  .sb { text-align:center; }
+  .sb .name { font-size:14px; font-weight:700; }
+  #aiName { color:var(--ai); } #huName { color:var(--human); }
+  .sb .spec { font-size:11px; color:var(--sub); margin-top:2px; font-family:'Consolas','Courier New',monospace; min-height:14px; }
+  .sb .pts { font-size:40px; font-weight:900; font-variant-numeric:tabular-nums; }
+  .vsline { font-size:20px; color:var(--sub); font-weight:800; }
+  .lamp-wrap { margin-top:20px; display:flex; justify-content:center; }
+  #lamp { width:460px; height:180px; border-radius:20px; background:#5c2a2e; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; cursor:pointer; user-select:none; border:2px solid #6e3a3f;
+    transition:background .08s; }
+  #lamp.ready { background:#8a3a40; }
+  #lamp.go { background:#1f7a4d; border-color:#4fd08a; }
+  #lamp .big { font-size:30px; font-weight:900; }
+  #lamp .small { font-size:14px; margin-top:8px; color:rgba(255,255,255,.75); }
+  .times { display:flex; justify-content:center; gap:80px; margin-top:14px; }
+  .t { text-align:center; }
+  .t .label { font-size:12px; color:var(--sub); }
+  .t .ms { font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; min-height:34px; }
+  .t .ms.win { color:#ffd24d; }
+  .log { text-align:center; font-size:13px; color:var(--sub); margin-top:10px; min-height:18px; }
+  .controls { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:18px; flex-wrap:wrap; }
+  button { border:0; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; }
+  #newMatch, #ruleBtn { background:#3a4060; }
+  .cpu { font-family:'Consolas','Courier New',monospace; background:#2c3145; border:1px solid #454c68;
+    padding:8px 12px; font-size:13px; line-height:1.2; text-align:left; }
+  .cpu small { display:block; font-size:10px; opacity:.65; font-weight:400; }
+  .cpu.active { background:var(--accent); border-color:var(--accent); }
+  .cpu-label { color:var(--sub); font-size:13px; }
+  .status { margin-top:12px; text-align:center; font-size:15px; color:var(--sub); min-height:22px; }
+  .status b { color:var(--text); }
+  .back { margin-top:10px; text-align:center; }
+  .back a { color:var(--sub); font-size:13px; text-decoration:none; border-bottom:1px solid #454c68; }
+  footer { margin-top:8px; color:var(--sub); font-size:11px; text-align:center; }
+  .modal { position:fixed; inset:0; background:rgba(12,14,22,.78); display:none; align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .modal.open { display:flex; }
+  .modal-box { background:var(--panel); border:1px solid #454c68; border-radius:18px; max-width:560px; width:100%;
+    max-height:86vh; overflow-y:auto; padding:24px 26px; font-size:14.5px; line-height:1.65; color:var(--sub); }
+  .modal-box h3 { font-size:19px; color:var(--text); margin-bottom:10px; }
+  .modal-box b { color:var(--accent); }
+  .modal-box .close { float:right; background:#3a4060; border-radius:8px; padding:6px 12px; cursor:pointer; color:var(--text); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="ai">🤖 AI</span><span class="vs">VS</span><span class="hu">🧑 나</span> <span style="font-size:20px;color:var(--sub)">— 반응속도 대결</span></h1>
+    <p class="rules"><b>초록 불</b>이 켜지는 순간 클릭! · 느린 쪽이 패배, <b>치트(성급한 클릭)</b>는 실격 · <b>5점 먼저</b></p>
+  </header>
+
+  <div class="scoreboard">
+    <div class="sb"><div class="name" id="aiName">🤖 AI</div><div class="spec" id="cpuSpec">2008 624MHz · 반응 480ms</div><div class="pts" id="aiPts">0</div></div>
+    <div class="vsline">VS</div>
+    <div class="sb"><div class="name" id="huName">🧑 나</div><div class="spec">인간 평균 반응 약 250ms</div><div class="pts" id="huPts">0</div></div>
+  </div>
+
+  <div class="lamp-wrap">
+    <div id="lamp">
+      <div class="big" id="lampBig">클릭해서 시작</div>
+      <div class="small" id="lampSmall">빨간 불 후 초록 불에 최대한 빠르게 클릭하세요</div>
+    </div>
+  </div>
+
+  <div class="times">
+    <div class="t"><div class="label">🤖 AI 반응</div><div class="ms" id="aiMs">—</div></div>
+    <div class="t"><div class="label">🧑 나 반응</div><div class="ms" id="huMs">—</div></div>
+  </div>
+  <div class="log" id="log"></div>
+
+  <div class="controls">
+    <button id="newMatch">🔄 새 대결</button>
+    <button id="ruleBtn">📖 규칙</button>
+    <span class="cpu-label">AI CPU:</span>
+    <button class="cpu" data-cpu="mw">🍲 전자레인지<small>반응 900ms</small></button>
+    <button class="cpu" data-cpu="ph">📱 피처폰<small>반응 700ms</small></button>
+    <button class="cpu" data-cpu="tv">📺 스마트TV<small>반응 540ms</small></button>
+    <button class="cpu active" data-cpu="om">📱 옴니아<small>반응 480ms</small></button>
+    <button class="cpu" data-cpu="gs">📱 아이폰3GS<small>반응 260ms</small></button>
+    <button class="cpu" data-cpu="m4">🧠 M4 Max<small>반응 90ms</small></button>
+  </div>
+  <div class="status" id="status">램프를 클릭하면 라운드가 시작됩니다 — 먼저 <b>5점</b>!</div>
+  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <footer>제품별 연산력 = 신호 처리 반응속도 · vanilla JS — 생성·실행·검증 ZCode</footer>
+
+  <div class="modal" id="ruleModal">
+    <div class="modal-box">
+      <button class="close" id="ruleClose">닫기 ✕</button>
+      <h3>⚡ 반응속도 대결 — 규칙</h3>
+      · 램프를 클릭하면 <b>빨간 불(대기)</b>이 켜지고, 1.5~4초 뒤 <b>초록 불</b>로 바뀝니다. 바뀌는 순간 다시 클릭!<br>
+      · 매 라운드 AI도 반응합니다. <b>더 빠른 쪽이 1점</b>, 먼저 5점을 내면 승리.<br>
+      · 초록 불 전에 클릭하면 <b>치트(성급한 출발)</b>로 실격 — 그 라운드는 AI가 가져갑니다.<br>
+      · CPU 등급 = <b>신호 처리 반응속도</b> — 전자레인지(900ms·데우는 중) → 피처폰(700ms) → 스마트TV(540ms) → 옴니아(480ms) → 아이폰3GS(260ms) → M4 Max(90ms·사람으로는 불가능).<br><br>
+      💡 <b>전략</b>: 인간 평균은 약 250ms입니다. 옴니아까지는 자신 있게 이길 수 있고, 3GS부터는 긴장, M4 Max는 <b>인간 한계 영역</b>입니다.
+    </div>
+  </div>
+</div>
+
+<script>
+const CPUS = {
+  mw: { name: '🍲 전자레인지',  spec: '700 W · 반응 900ms', ms: 900 },
+  ph: { name: '📱 피처폰',     spec: '2005 ARM9 · 반응 700ms', ms: 700 },
+  tv: { name: '📺 스마트 TV',  spec: '2010 듀얼코어 · 반응 540ms', ms: 540 },
+  om: { name: '📱 옴니아',     spec: '2008 624MHz · 반응 480ms', ms: 480 },
+  gs: { name: '📱 아이폰 3GS', spec: '2009 Cortex-A8 · 반응 260ms', ms: 260 },
+  m4: { name: '🧠 M4 Max',     spec: '2026 풀가속 · 반응 90ms', ms: 90 },
+};
+let currentCpu = 'om';
+
+const lamp = document.getElementById('lamp');
+const lampBig = document.getElementById('lampBig'), lampSmall = document.getElementById('lampSmall');
+const aiMsEl = document.getElementById('aiMs'), huMsEl = document.getElementById('huMs');
+const logEl = document.getElementById('log'), statusEl = document.getElementById('status');
+let huPts = 0, aiPts = 0, over = false;
+let state = 'idle'; // idle | wait | go | done
+let goTime = 0, timer1 = null, timer2 = null;
+
+function setStatus(html) { statusEl.innerHTML = html; }
+function clearTimers() { if (timer1) clearTimeout(timer1); if (timer2) clearTimeout(timer2); }
+
+function startRound() {
+  state = 'wait';
+  lamp.className = 'ready';
+  lampBig.textContent = '기다리세요…';
+  lampSmall.textContent = '초록 불에 클릭! 성급하면 실격';
+  aiMsEl.textContent = '—'; aiMsEl.className = 'ms';
+  huMsEl.textContent = '—'; huMsEl.className = 'ms';
+  const delay = 1500 + Math.random() * 2500;
+  timer1 = setTimeout(() => {
+    state = 'go';
+    goTime = performance.now();
+    lamp.className = 'go';
+    lampBig.textContent = '지금 클릭!';
+    lampSmall.textContent = '⚡⚡⚡';
+    // AI 반응
+    const aiReact = CPUS[currentCpu].ms * (0.8 + Math.random() * 0.5);
+    timer2 = setTimeout(() => {
+      if (state !== 'go') return;
+      aiMsEl.textContent = Math.round(aiReact) + 'ms';
+      aiMsEl.className = 'ms win';
+      settle(true); // AI 먼저 완료
+    }, aiReact);
+  }, delay);
+}
+
+function settle(aiWon, huReact) {
+  if (state === 'done' || over) return;
+  state = 'done';
+  clearTimers();
+  if (aiWon) {
+    aiPts++; document.getElementById('aiPts').textContent = aiPts;
+    logEl.textContent = 'AI가 먼저 반응했습니다 — AI 득점';
+  } else {
+    huPts++; document.getElementById('huPts').textContent = huPts;
+    logEl.textContent = '당신이 더 빨랐습니다! — 당신 득점';
+  }
+  if (huPts >= 5 || aiPts >= 5) {
+    over = true;
+    lamp.className = 'ready';
+    lampBig.textContent = huPts >= 5 ? '🏆 당신 승리!' : '🤖 AI 승리';
+    lampSmall.textContent = '클릭해서 새 대결';
+    setStatus(huPts >= 5
+      ? '<b>당신 승리!</b> ' + huPts + ' : ' + aiPts + ' — 신경 전달 속도가 ' + CPUS[currentCpu].name + '보다 빠릅니다'
+      : '<b>' + CPUS[currentCpu].name + ' 승리</b> — ' + aiPts + ' : ' + huPts + ' · 등급을 낮추고 복수하세요');
+    state = 'idle';
+    return;
+  }
+  setTimeout(() => { if (!over) { state = 'idle'; lamp.className = 'ready'; lampBig.textContent = '클릭해서 다음 라운드'; lampSmall.textContent = '다음 초록 불을 노리세요'; } }, 1400);
+}
+
+lamp.addEventListener('click', () => {
+  if (over) return;
+  if (state === 'idle') startRound();
+  else if (state === 'wait') { // 성급한 출발
+    clearTimers(); state = 'done';
+    huMsEl.textContent = '치트!';
+    logEl.textContent = '너무 일찍 눌렀습니다 — 실격, AI 득점';
+    aiPts++; document.getElementById('aiPts').textContent = aiPts;
+    if (aiPts >= 5) {
+      over = true;
+      setStatus('<b>' + CPUS[currentCpu].name + ' 승리</b> — 초조함이 패배를 불렀습니다');
+      lampBig.textContent = '🤖 AI 승리';
+      state = 'idle';
+      return;
+    }
+    setTimeout(() => { if (!over) { state = 'idle'; lamp.className = 'ready'; lampBig.textContent = '클릭해서 다음 라운드'; lampSmall.textContent = '이번엔 참으세요'; } }, 1400);
+  } else if (state === 'go') {
+    const react = performance.now() - goTime;
+    huMsEl.textContent = Math.round(react) + 'ms';
+    const aiReact = CPUS[currentCpu].ms * (0.8 + Math.random() * 0.5);
+    aiMsEl.textContent = Math.round(aiReact) + 'ms';
+    const aiWon = aiReact <= react;
+    (aiWon ? aiMsEl : huMsEl).className = 'ms win';
+    settle(aiWon, react);
+  }
+});
+document.getElementById('newMatch').addEventListener('click', () => {
+  clearTimers(); huPts = 0; aiPts = 0; over = false; state = 'idle';
+  document.getElementById('huPts').textContent = 0;
+  document.getElementById('aiPts').textContent = 0;
+  aiMsEl.textContent = '—'; aiMsEl.className = 'ms';
+  huMsEl.textContent = '—'; huMsEl.className = 'ms';
+  logEl.textContent = '';
+  lamp.className = 'ready';
+  lampBig.textContent = '클릭해서 시작';
+  lampSmall.textContent = '빨간 불 후 초록 불에 최대한 빠르게 클릭하세요';
+  setStatus('새 대결 (AI: <b>' + CPUS[currentCpu].name + '</b> · 반응 ' + CPUS[currentCpu].ms + 'ms) — 먼저 <b>5점</b>!');
+});
+document.querySelectorAll('.cpu').forEach(btn =>
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cpu').forEach(x => x.classList.remove('active'));
+    btn.classList.add('active');
+    currentCpu = btn.dataset.cpu;
+    document.getElementById('aiName').textContent = '🤖 ' + CPUS[currentCpu].name;
+    document.getElementById('cpuSpec').textContent = CPUS[currentCpu].spec;
+    setStatus('AI 교체: <b>' + CPUS[currentCpu].name + '</b> (' + CPUS[currentCpu].spec + ')');
+  }));
+const ruleModal = document.getElementById('ruleModal');
+document.getElementById('ruleBtn').addEventListener('click', () => ruleModal.classList.add('open'));
+document.getElementById('ruleClose').addEventListener('click', () => ruleModal.classList.remove('open'));
+ruleModal.addEventListener('click', e => { if (e.target === ruleModal) ruleModal.classList.remove('open'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') ruleModal.classList.remove('open'); });
+</script>
+</body>
+</html>

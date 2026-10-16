@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>숫자야구 AI 대결 — ZCode 데모</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --text:#e8eaf2; --sub:#9aa1b5; --accent:#7c8cf8; --human:#4fd08a; --ai:#e0645c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .app { width:780px; }
+  header { text-align:center; margin-bottom:8px; }
+  header h1 { font-size:28px; }
+  header h1 .ai { color:var(--ai); } header h1 .hu { color:var(--human); }
+  header h1 .vs { font-size:18px; color:var(--sub); margin:0 8px; }
+  .rules { color:var(--sub); font-size:13px; margin-top:6px; }
+  .rules b { color:var(--text); }
+  .arena { display:flex; gap:16px; justify-content:center; margin-top:14px; }
+  .col { width:320px; background:var(--panel); border-radius:16px; padding:16px; }
+  .col h2 { font-size:16px; margin-bottom:10px; }
+  #huCol h2 { color:var(--human); } #aiCol h2 { color:var(--ai); }
+  .col .spec { font-size:11px; color:var(--sub); font-family:'Consolas','Courier New',monospace; margin-top:-6px; margin-bottom:8px; min-height:14px; }
+  .secret-row { display:flex; gap:8px; align-items:center; margin-bottom:10px; }
+  input[type=text] { width:110px; background:#1f2333; border:2px solid #454c68; border-radius:10px;
+    color:var(--text); font-size:20px; font-weight:800; padding:8px 10px; text-align:center; letter-spacing:4px; font-family:monospace; }
+  input[type=text]:focus { outline:none; border-color:var(--accent); }
+  .secret-row button, .guess-row button { background:#3a4060; border:0; border-radius:10px; color:#fff;
+    font-size:13px; font-weight:700; padding:10px 14px; cursor:pointer; }
+  .secret-row button:disabled, .guess-row button:disabled { opacity:.4; cursor:default; }
+  .guess-row { display:flex; gap:8px; align-items:center; margin-top:10px; }
+  .glog { margin-top:10px; max-height:200px; overflow-y:auto; }
+  .grow { display:flex; justify-content:space-between; align-items:center; padding:6px 10px; border-radius:8px;
+    background:#1f2333; margin-bottom:6px; font-family:monospace; font-size:15px; }
+  .grow .num { font-weight:800; letter-spacing:2px; }
+  .grow .fb { font-size:13px; }
+  .grow .fb .s { color:#ffd24d; font-weight:800; }
+  .grow .fb .b { color:var(--accent); font-weight:800; }
+  .grow.hit { box-shadow:0 0 0 2px #ffd24d; }
+  .hint { font-size:12px; color:var(--sub); margin-top:6px; line-height:1.5; }
+  .overlaybox { margin-top:14px; background:var(--panel); border-radius:14px; padding:14px; text-align:center;
+    display:none; font-size:22px; font-weight:900; }
+  .overlaybox.show { display:block; }
+  .overlaybox.win { color:#ffd24d; } .overlaybox.lose { color:#8b93a8; } .overlaybox.draw { color:var(--sub); }
+  .controls { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+  button { border:0; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; }
+  #newMatch, #ruleBtn { background:#3a4060; }
+  .cpu { font-family:'Consolas','Courier New',monospace; background:#2c3145; border:1px solid #454c68;
+    padding:8px 12px; font-size:13px; line-height:1.2; text-align:left; }
+  .cpu small { display:block; font-size:10px; opacity:.65; font-weight:400; }
+  .cpu.active { background:var(--accent); border-color:var(--accent); }
+  .cpu-label { color:var(--sub); font-size:13px; }
+  .status { margin-top:12px; text-align:center; font-size:15px; color:var(--sub); min-height:22px; }
+  .status b { color:var(--text); }
+  .back { margin-top:10px; text-align:center; }
+  .back a { color:var(--sub); font-size:13px; text-decoration:none; border-bottom:1px solid #454c68; }
+  footer { margin-top:8px; color:var(--sub); font-size:11px; text-align:center; }
+  .modal { position:fixed; inset:0; background:rgba(12,14,22,.78); display:none; align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .modal.open { display:flex; }
+  .modal-box { background:var(--panel); border:1px solid #454c68; border-radius:18px; max-width:560px; width:100%;
+    max-height:86vh; overflow-y:auto; padding:24px 26px; font-size:14.5px; line-height:1.65; color:var(--sub); }
+  .modal-box h3 { font-size:19px; color:var(--text); margin-bottom:10px; }
+  .modal-box b { color:var(--accent); }
+  .modal-box .close { float:right; background:#3a4060; border-radius:8px; padding:6px 12px; cursor:pointer; color:var(--text); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="ai">🤖 AI</span><span class="vs">VS</span><span class="hu">🧑 나</span> <span style="font-size:20px;color:var(--sub)">— 숫자야구</span></h1>
+    <p class="rules">서로의 <b>3자리 비밀번호</b>(0~9, 중복 없음)를 맞추기 · <b>S</b>트라이크 = 숫자+자리 정답, <b>B</b>볼 = 숫자만 정답 · <b>적은 시도</b>로 맞춘 쪽이 승리</p>
+  </header>
+
+  <div class="arena">
+    <div class="col" id="huCol">
+      <h2>🧑 나 — AI의 비밀번호 맞추기</h2>
+      <div class="guess-row">
+        <input type="text" id="huGuess" maxlength="3" placeholder="예: 123" inputmode="numeric">
+        <button id="huGuessBtn">추측!</button>
+      </div>
+      <div class="glog" id="huLog"></div>
+      <div class="hint">S = 숫자·자리 모두 정답 / B = 숫자만 정답 / 같은 시도 횟수면 무승부</div>
+    </div>
+
+    <div class="col" id="aiCol">
+      <h2>🤖 AI ( <span id="cpuName">📱 옴니아</span> ) — 내 비밀번호 맞추기</h2>
+      <div class="spec" id="cpuSpec">2008 624MHz · 소거법 완전 구동</div>
+      <div class="secret-row">
+        <input type="text" id="huSecret" maxlength="3" placeholder="내 비밀번호">
+        <button id="huSecretBtn">설정</button>
+      </div>
+      <div class="hint" id="secretHint">당신의 비밀번호 3자리를 입력하세요 (0~9 서로 다른 숫자). 설정 후 대국 시작!</div>
+      <div class="glog" id="aiLog"></div>
+    </div>
+  </div>
+
+  <div class="overlaybox" id="resultBox"></div>
+
+  <div class="controls">
+    <button id="newMatch">🔄 새 대국</button>
+    <button id="ruleBtn">📖 규칙</button>
+    <span class="cpu-label">AI CPU:</span>
+    <button class="cpu" data-cpu="mw">🍲 전자레인지<small>완전 랜덤</small></button>
+    <button class="cpu" data-cpu="ph">📱 피처폰<small>S만 기억</small></button>
+    <button class="cpu" data-cpu="tv">📺 스마트TV<small>가끔 잊음</small></button>
+    <button class="cpu active" data-cpu="om">📱 옴니아<small>소거법 완전</small></button>
+    <button class="cpu" data-cpu="gs">📱 아이폰3GS<small>정보 이득 추정</small></button>
+    <button class="cpu" data-cpu="m4">🧠 M4 Max<small>정보 이득 극대화</small></button>
+  </div>
+  <div class="status" id="status">먼저 당신의 비밀번호를 설정하세요</div>
+  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <footer>제품별 연산력 = 후보 소거 능력 · vanilla JS — 생성·실행·검증 ZCode</footer>
+
+  <div class="modal" id="ruleModal">
+    <div class="modal-box">
+      <button class="close" id="ruleClose">닫기 ✕</button>
+      <h3>⚾ 숫자야구 — 규칙</h3>
+      · 각자 <b>3자리 비밀번호</b>(0~9, 숫자 중복 없음)를 정하고, 번갈아 상대 비밀번호를 추측합니다.<br>
+      · 피드백: <b style="color:#ffd24d">S(스트라이크)</b> = 숫자와 자리가 모두 정답, <b style="color:#7c8cf8">B(볼)</b> = 숫자는 있지만 자리가 틀림.<br>
+      · <b>더 적은 시도</b>로 먼저 맞춘 쪽이 승리 (동시에 맞추면 무승부). 당신이 먼저 추측합니다.<br>
+      · CPU 등급 = <b>피드백 소거법의 연산력</b> — 전자레인지(피드백 무시·완전 랜덤) → 피처폰(스트라이크만 반영) → 스마트TV(소거하다 가끔 잊음) → 옴니아(완전 소거법) → 3GS·M4 Max(정보 이득이 큰 추측을 골라 평균 시도 단축).<br><br>
+      💡 <b>전략</b>: 첫 추측은 서로 다른 숫자 3개로 넓게 검사(예: 012). 이후 매 추측마다 가능한 후보를 좁혀가세요 — AI의 소거법과 같은 원리입니다!
+    </div>
+  </div>
+</div>
+
+<script>
+const CPUS = {
+  mw: { name: '🍲 전자레인지',  spec: '700 W · 완전 랜덤 추측', tier: 0 },
+  ph: { name: '📱 피처폰',     spec: '2005 ARM9 · S만 기억', tier: 1 },
+  tv: { name: '📺 스마트 TV',  spec: '2010 듀얼코어 · 소거하다 가끔 잊음', tier: 2 },
+  om: { name: '📱 옴니아',     spec: '2008 624MHz · 소거법 완전 구동', tier: 3 },
+  gs: { name: '📱 아이폰 3GS', spec: '2009 Cortex-A8 · 정보 이득 추정', tier: 4 },
+  m4: { name: '🧠 M4 Max',     spec: '2026 풀가속 · 정보 이득 극대화', tier: 5 },
+};
+let currentCpu = 'om';
+
+const ALL = []; // 모든 3자리 후보 (문자열)
+for (let a = 0; a <= 9; a++) for (let b = 0; b <= 9; b++) for (let c = 0; c <= 9; c++)
+  if (a !== b && b !== c && a !== c) ALL.push('' + a + b + c);
+
+function feedback(guess, secret) {
+  let s = 0, b = 0;
+  for (let i = 0; i < 3; i++) {
+    if (guess[i] === secret[i]) s++;
+    else if (secret.includes(guess[i])) b++;
+  }
+  return s + 'S' + b + 'B';
+}
+function isValid(s) {
+  return /^\d{3}$/.test(s) && new Set(s).size === 3;
+}
+
+let aiSecret, huSecret, aiCandidates, started, over, turnCount;
+const huLog = document.getElementById('huLog'), aiLog = document.getElementById('aiLog');
+const statusEl = document.getElementById('status'), resultBox = document.getElementById('resultBox');
+
+function setStatus(html) { statusEl.innerHTML = html; }
+function addLog(el, num, fb, hit, who) {
+  const d = document.createElement('div');
+  d.className = 'grow' + (hit ? ' hit' : '');
+  const fbHtml = hit ? '<span class="fb">🎉 ' + (who === 'hu' ? 'AI 비밀번호 정답!' : '내 비밀번호 뚫림!') + '</span>'
+    : '<span class="fb"><span class="s">' + fb[0] + 'S</span> <span class="b">' + fb[2] + 'B</span></span>';
+  d.innerHTML = '<span class="num">' + num + '</span>' + fbHtml;
+  el.prepend(d);
+}
+
+let aiGuesses = []; // {g, fb} 기록
+// AI 추측 선택: tier별 소거법
+function aiPick() {
+  const tier = CPUS[currentCpu].tier;
+  if (!aiCandidates.length) aiCandidates = ALL.slice();
+  if (tier === 0) return ALL[Math.floor(Math.random() * ALL.length)]; // 전자레인지: 피드백 무시
+  if (tier === 1) { // S(스트라이크)만 반영한 느슨한 필터
+    const pool = ALL.filter(c => aiGuesses.every(({ g, fb }) => feedback(g, c)[0] === fb[0]));
+    const p = pool.length ? pool : ALL;
+    return p[Math.floor(Math.random() * p.length)];
+  }
+  // tier>=2: 남은 후보군에서 선택 (tv는 가끔 소거 누락)
+  let pool = aiCandidates;
+  if (tier === 4 || tier === 5) {
+    // 정보 이득: 후보를 샘플해 피드백 분포가 가장 고른 것 선택
+    let best = pool[0], bestScore = -1;
+    const sample = pool.slice(0, 40);
+    for (const cand of sample) {
+      const dist = {};
+      for (const s of pool) {
+        const f = feedback(cand, s);
+        dist[f] = (dist[f] || 0) + 1;
+      }
+      const maxBin = Math.max(...Object.values(dist));
+      const score = pool.length - maxBin; // 최대 군집이 작을수록 정보 이득↑
+      if (score > bestScore) { bestScore = score; best = cand; }
+    }
+    return best;
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+function aiFilter(guess, fb) {
+  const tier = CPUS[currentCpu].tier;
+  aiGuesses.push({ g: guess, fb });
+  if (tier === 0) return; // 기억 없음
+  if (tier === 1) { aiCandidates = aiCandidates.filter(c => feedback(guess, c)[0] === fb[0]); return; }
+  if (tier === 2 && Math.random() < 0.25) return; // 가끔 까먹음
+  aiCandidates = aiCandidates.filter(c => feedback(guess, c) === fb);
+}
+
+function aiTurn() {
+  if (over) return;
+  setTimeout(() => {
+    if (over) return;
+    const guess = aiPick();
+    const fb = feedback(guess, huSecret);
+    const hit = fb === '3S0B';
+    addLog(aiLog, guess, fb, hit, 'ai');
+    if (hit) {
+      aiFilter(guess, fb);
+      finish('ai', guess);
+      return;
+    }
+    aiFilter(guess, fb);
+    setStatus('AI가 ' + guess + ' → ' + fb + ' · 당신 차례 — 추측하세요');
+  }, 600 + Math.random() * 700);
+}
+function finish(winner, num) {
+  over = true; started = false;
+  if (winner === 'draw') {
+    resultBox.textContent = '🤝 무승부 — 같은 ' + turnCount + '시도에 동시 정답! (AI 비밀번호: ' + aiSecret + ')';
+    resultBox.className = 'overlaybox show draw';
+    setStatus('<b>무승부!</b> 대등한 두뇌 싸움이었습니다');
+  } else if (winner === 'hu') {
+    resultBox.textContent = '🏆 ' + turnCount + '시도 만에 정답! (AI 비밀번호: ' + aiSecret + ')';
+    resultBox.className = 'overlaybox show win';
+    setStatus('<b>당신 승리!</b> ' + CPUS[currentCpu].name + '보다 빨리 뚫었습니다');
+  } else {
+    resultBox.textContent = '🤖 AI가 ' + turnCount + '시도 만에 내 비밀번호 ' + num + '를 뚫었습니다';
+    resultBox.className = 'overlaybox show lose';
+    setStatus('<b>' + CPUS[currentCpu].name + ' 승리</b> — 등급을 낮추고 복수하세요');
+  }
+}
+
+// 내 추측
+document.getElementById('huGuessBtn').addEventListener('click', () => {
+  if (!started || over) return;
+  const v = document.getElementById('huGuess').value.trim();
+  if (!isValid(v)) { setStatus('3자리, 서로 다른 숫자여야 합니다 (예: 012)'); return; }
+  document.getElementById('huGuess').value = '';
+  turnCount++;
+  const fb = feedback(v, aiSecret);
+  const hit = fb === '3S0B';
+  addLog(huLog, v, fb, hit, 'hu');
+  if (hit) { finish('hu'); return; }
+  setStatus('나: ' + v + ' → ' + fb + ' · AI 생각 중…');
+  aiTurn();
+});
+// 비밀번호 설정
+document.getElementById('huSecretBtn').addEventListener('click', () => {
+  if (started || over) return;
+  const v = document.getElementById('huSecret').value.trim();
+  if (!isValid(v)) { setStatus('비밀번호도 3자리 서로 다른 숫자! (예: 381)'); return; }
+  huSecret = v;
+  document.getElementById('huSecret').disabled = true;
+  document.getElementById('huSecretBtn').disabled = true;
+  document.getElementById('secretHint').innerHTML = '비밀번호 <b>' + v + '</b> 설정 완료 — 첫 추측을 시작하세요!';
+  started = true;
+  setStatus('대국 시작! AI 비밀번호를 추측하세요 (AI: <b>' + CPUS[currentCpu].name + '</b>)');
+});
+document.getElementById('huSecret').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('huSecretBtn').click(); });
+document.getElementById('huGuess').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('huGuessBtn').click(); });
+
+document.getElementById('newMatch').addEventListener('click', newMatch);
+function newMatch() {
+  aiSecret = ALL[Math.floor(Math.random() * ALL.length)];
+  huSecret = null;
+  aiCandidates = ALL.slice();
+  aiGuesses = [];
+  started = false; over = false; turnCount = 0;
+  huLog.innerHTML = ''; aiLog.innerHTML = '';
+  resultBox.className = 'overlaybox'; resultBox.textContent = '';
+  const s = document.getElementById('huSecret');
+  s.disabled = false; s.value = '';
+  document.getElementById('huSecretBtn').disabled = false;
+  document.getElementById('huGuess').value = '';
+  document.getElementById('secretHint').textContent = '당신의 비밀번호 3자리를 입력하세요 (0~9 서로 다른 숫자). 설정 후 대국 시작!';
+  setStatus('새 대국 (AI: <b>' + CPUS[currentCpu].name + '</b>) — 먼저 당신의 비밀번호를 설정하세요');
+}
+document.querySelectorAll('.cpu').forEach(btn =>
+  btn.addEventListener('click', () => {
+    if (started) { setStatus('대국 중에는 CPU를 바꿀 수 없습니다'); return; }
+    document.querySelectorAll('.cpu').forEach(x => x.classList.remove('active'));
+    btn.classList.add('active');
+    currentCpu = btn.dataset.cpu;
+    document.getElementById('cpuName').textContent = CPUS[currentCpu].name;
+    document.getElementById('cpuSpec').textContent = CPUS[currentCpu].spec;
+    setStatus('AI 교체: <b>' + CPUS[currentCpu].name + '</b> (' + CPUS[currentCpu].spec + ')');
+  }));
+const ruleModal = document.getElementById('ruleModal');
+document.getElementById('ruleBtn').addEventListener('click', () => ruleModal.classList.add('open'));
+document.getElementById('ruleClose').addEventListener('click', () => ruleModal.classList.remove('open'));
+ruleModal.addEventListener('click', e => { if (e.target === ruleModal) ruleModal.classList.remove('open'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') ruleModal.classList.remove('open'); });
+newMatch();
+</script>
+</body>
+</html>

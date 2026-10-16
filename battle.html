@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2048 AI 대결 — ZCode 데모</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --cellbg:#1f2333; --text:#e8eaf2; --sub:#9aa1b5; --accent:#7c8cf8; --human:#4fd08a; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .app { width:800px; }
+  header { text-align:center; margin-bottom:8px; }
+  header h1 { font-size:30px; }
+  header h1 .ai { color:var(--accent); }
+  header h1 .hu { color:var(--human); }
+  header h1 .vs { font-size:20px; color:var(--sub); margin:0 10px; }
+  .rules { color:var(--sub); font-size:13px; margin-top:6px; }
+  .rules b { color:var(--text); }
+  .arena { display:flex; gap:14px; justify-content:center; margin-top:12px; }
+  .side { flex:1; max-width:330px; }
+  .mid { align-self:center; font-size:26px; font-weight:900; color:var(--sub); }
+  .side-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .side-head .tag { font-size:18px; font-weight:800; }
+  #aiSide .tag { color:var(--accent); }
+  #humanSide .tag { color:var(--human); }
+  .spec { font-size:11px; color:var(--sub); margin-top:2px; font-family:'Consolas','Courier New',monospace; }
+  .score-box { background:var(--panel); border-radius:10px; padding:6px 14px; text-align:right; }
+  .score-box .label { font-size:11px; color:var(--sub); }
+  .score-box .value { font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .board-wrap { position:relative; }
+  .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; background:var(--panel); padding:8px; border-radius:14px; }
+  .cell { aspect-ratio:1; background:var(--cellbg); border-radius:9px; display:flex; align-items:center; justify-content:center;
+    font-size:26px; font-weight:800; color:#fff; }
+  .tile-2 { background:#5c6480; } .tile-4 { background:#7a82a8; } .tile-8 { background:#7c8cf8; }
+  .tile-16 { background:#6a7cf0; } .tile-32 { background:#5d6ce8; } .tile-64 { background:#7c5cf8; }
+  .tile-128 { background:#9a5cf8; font-size:22px; } .tile-256 { background:#b85cf8; font-size:22px; }
+  .tile-512 { background:#d85cf0; font-size:22px; } .tile-1024 { background:#f85cb8; font-size:18px; }
+  .tile-2048 { background:#f8b05c; color:#222; font-size:18px; }
+  .tile-super { background:#ffd24d; color:#222; font-size:18px; }
+  .overlay { position:absolute; inset:0; background:rgba(18,20,32,.85); display:none; align-items:center;
+    justify-content:center; border-radius:14px; font-size:26px; font-weight:900; z-index:5; }
+  .overlay.win { display:flex; color:#ffd24d; }
+  .overlay.lose { display:flex; color:#8b93a8; }
+  .mini { margin-top:8px; font-size:13px; color:var(--sub); text-align:center; min-height:18px; }
+  .arrows { display:flex; gap:8px; justify-content:center; margin-top:10px; }
+  button { border:0; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; }
+  .arrows button { background:#3a4060; padding:10px 16px; }
+  .controls { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+  #newMatch { background:#3a4060; }
+  .cpu { font-family:'Consolas','Courier New',monospace; background:#2c3145; border:1px solid #454c68;
+    padding:8px 12px; font-size:13px; line-height:1.2; text-align:left; }
+  .cpu small { display:block; font-size:10px; opacity:.65; font-weight:400; }
+  .cpu.active { background:var(--accent); border-color:var(--accent); }
+  .cpu-label { color:var(--sub); font-size:13px; }
+  .status { margin-top:12px; text-align:center; font-size:15px; color:var(--sub); min-height:22px; }
+  .status b { color:var(--text); }
+  #ruleBtn { background:#3a4060; }
+  .modal { position:fixed; inset:0; background:rgba(12,14,22,.78); display:none;
+    align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .modal.open { display:flex; }
+  .modal-box { background:var(--panel); border:1px solid #454c68; border-radius:18px; max-width:560px;
+    width:100%; max-height:86vh; overflow-y:auto; padding:24px 26px; font-size:14.5px; line-height:1.65; color:var(--sub); }
+  .modal-box h3 { font-size:19px; color:var(--text); margin-bottom:10px; }
+  .modal-box b { color:var(--accent); }
+  .modal-box .close { float:right; background:#3a4060; border-radius:8px; padding:6px 12px; cursor:pointer;
+    color:var(--text); font-size:13px; }
+  footer { margin-top:10px; color:var(--sub); font-size:11px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="ai">🤖 AI</span><span class="vs">VS</span><span class="hu">🧑 나</span> <span style="font-size:20px;color:var(--sub)">— 2048 대결</span></h1>
+    <p class="rules">두 보드는 <b>같은 시드</b>로 시작 · <b>먼저 2048</b> 또는 상대 <b>게임오버</b>면 승리 · CPU 등급에 따라 AI의 <b>속도와 사고 깊이</b>가 달라집니다</p>
+  </header>
+
+  <div class="arena">
+    <section class="side" id="aiSide">
+      <div class="side-head">
+        <div>
+          <span class="tag">🤖 <span id="cpuName">📱 옴니아</span></span>
+          <div class="spec" id="cpuSpec">2008 624MHz · 깊이 3 · 450ms/수</div>
+        </div>
+        <div class="score-box"><div class="label">점수</div><div class="value" id="aiScore">0</div></div>
+      </div>
+      <div class="board-wrap">
+        <div class="grid" id="aiGrid"></div>
+        <div class="overlay" id="aiOverlay"></div>
+      </div>
+      <div class="mini" id="aiMini">당신의 첫 수를 기다리는 중…</div>
+    </section>
+
+    <div class="mid">VS</div>
+
+    <section class="side" id="humanSide">
+      <div class="side-head">
+        <div>
+          <span class="tag">🧑 나</span>
+          <div class="spec">생물학적 뉴런 860억 개 · 반응속도 미정</div>
+        </div>
+        <div class="score-box"><div class="label">점수</div><div class="value" id="huScore">0</div></div>
+      </div>
+      <div class="board-wrap">
+        <div class="grid" id="huGrid"></div>
+        <div class="overlay" id="huOverlay"></div>
+      </div>
+      <div class="mini" id="huMini">방향키를 눌러 시작!</div>
+      <div class="arrows">
+        <button data-dir="left" aria-label="왼쪽">←</button>
+        <button data-dir="up" aria-label="위">↑</button>
+        <button data-dir="down" aria-label="아래">↓</button>
+        <button data-dir="right" aria-label="오른쪽">→</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="controls">
+    <button id="newMatch">🔄 새 대결</button>
+    <button id="ruleBtn">📖 규칙</button>
+    <span class="cpu-label">AI CPU:</span>
+    <button class="cpu" data-cpu="mw">🍲 전자레인지<small>700W · 깊이 0</small></button>
+    <button class="cpu" data-cpu="ph">📱 피처폰<small>ARM9 · 깊이 1</small></button>
+    <button class="cpu" data-cpu="tv">📺 스마트TV<small>듀얼코어 · 깊이 2</small></button>
+    <button class="cpu active" data-cpu="om">📱 옴니아<small>624MHz · 깊이 3</small></button>
+    <button class="cpu" data-cpu="gs">📱 아이폰3GS<small>Cortex-A8 · 깊이 4</small></button>
+    <button class="cpu" data-cpu="m4">🧠 M4 Max<small>2026 · 깊이 5</small></button>
+  </div>
+  <div class="status" id="status">방향키(← ↑ ↓ →) 또는 오른쪽 화살표 버튼을 누르면 대결이 시작됩니다</div>
+  <div style="margin-top:10px;text-align:center"><a href="index.html" style="color:var(--sub);font-size:13px;text-decoration:none;border-bottom:1px solid #454c68">← 게임 로비로</a></div>
+  <footer>같은 시드 · CPU 등급 = 수 속도 + 사고 깊이(휴리스틱 단계) · vanilla JS 단일 파일 — 생성·실행·검증 ZCode</footer>
+
+  <div class="modal" id="ruleModal">
+    <div class="modal-box">
+      <button class="close" id="ruleClose">닫기 ✕</button>
+      <h3>🔢 2048 대결 — 규칙</h3>
+      · 내 보드(오른쪽)에서 <b>2048 타일을 먼저</b> 만들거나, <b>AI 보드가 게임오버</b>되면 승리합니다.<br>
+      · 같은 숫자가 부딪히면 합쳐지고 점수가 올라갑니다. 매 수 후 새 타일(2 또는 4)이 랜덤 위치에 생성됩니다.<br>
+      · 두 보드는 <b>같은 시드</b>로 시작하므로 초기 타일과 생성 패턴이 완전히 동일합니다 — 실력 대결!<br>
+      · <b>방향키(← ↑ ↓ →)</b> 또는 화면 화살표 버튼으로 이동하며, <b>첫 수를 두는 순간</b> AI도 달리기 시작합니다.<br>
+      · CPU 등급이 높을수록 AI가 <b>빠르고 깊이</b> 생각합니다 — 전자레인지(무작위·2초/수)부터 M4 Max(2수 전망·0.12초/수)까지. 대결 중에도 실시간 교체 가능합니다.<br><br>
+      💡 <b>전략</b>: 가장 큰 타일을 한쪽 코너에 고정하고, 위쪽 이동은 꼭 필요할 때만 사용하세요. M4 Max 상대는 속도전입니다.
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── 유틸 ───────────────────────────────────────────────
+function mulberry32(a) {
+  return function() {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const SIZE = 4;
+const DIRS = ['up', 'left', 'right', 'down'];
+const emptyGrid = () => Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+function spawnRng(g, rng) {
+  const empties = [];
+  for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) if (!g[r][c]) empties.push([r, c]);
+  if (!empties.length) return;
+  const [r, c] = empties[Math.floor(rng() * empties.length)];
+  g[r][c] = rng() < 0.9 ? 2 : 4;
+}
+function slideRow(row) {
+  const arr = row.filter(v => v);
+  let gained = 0;
+  for (let i = 0; i < arr.length - 1; i++) {
+    if (arr[i] === arr[i + 1]) { arr[i] *= 2; gained += arr[i]; arr.splice(i + 1, 1); }
+  }
+  while (arr.length < SIZE) arr.push(0);
+  return { arr, gained };
+}
+function applyMove(g, dir) {
+  let gained = 0, moved = false;
+  const ng = emptyGrid();
+  if (dir === 'left' || dir === 'right') {
+    for (let r = 0; r < SIZE; r++) {
+      let row = g[r].slice();
+      if (dir === 'right') row.reverse();
+      const res = slideRow(row);
+      let out = res.arr;
+      if (dir === 'right') out = out.slice().reverse();
+      ng[r] = out; gained += res.gained;
+      if (out.join(',') !== g[r].join(',')) moved = true;
+    }
+  } else {
+    for (let c = 0; c < SIZE; c++) {
+      let col = [];
+      for (let r = 0; r < SIZE; r++) col.push(g[r][c]);
+      if (dir === 'down') col.reverse();
+      const res = slideRow(col);
+      let out = res.arr;
+      if (dir === 'down') out = out.slice().reverse();
+      for (let r = 0; r < SIZE; r++) ng[r][c] = out[r];
+      gained += res.gained;
+      if (out.join(',') !== col.join(',')) moved = true;
+    }
+  }
+  return { g: ng, gained, moved };
+}
+function canMove(g) {
+  for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+    if (!g[r][c]) return true;
+    if (c < SIZE - 1 && g[r][c] === g[r][c + 1]) return true;
+    if (r < SIZE - 1 && g[r][c] === g[r + 1][c]) return true;
+  }
+  return false;
+}
+const maxTile = g => Math.max(...g.flat());
+
+// ─── CPU 세대별 AI 두뇌 (깊이 0~5) ──────────────────────
+// 깊이 0: 무작위 / 1: 갈 수 있는 대로 이동 / 2: 당장 병합 점수 / 3: +빈 칸 / 4: +코너 전략 / 5: 2수 전망
+function brain0(g) { // 전자레인지: 생각 없음, 순수 무작위
+  const movable = DIRS.filter(d => applyMove(g, d).moved);
+  return movable.length ? movable[Math.floor(Math.random() * movable.length)] : null;
+}
+function heur(g, withCorner) {
+  const empties = g.flat().filter(v => !v).length;
+  const mx = maxTile(g);
+  let v = empties * 25 + mx * 0.5;
+  if (withCorner) {
+    const corner = (g[0][0] === mx || g[0][SIZE-1] === mx || g[SIZE-1][0] === mx || g[SIZE-1][SIZE-1] === mx) ? 300 : 0;
+    v += corner;
+  }
+  return v;
+}
+function brain1(g) { // 286: 즉흥
+  for (const d of DIRS) if (applyMove(g, d).moved) return d;
+  return null;
+}
+function brain2(g) { // 386: 당장의 점수만
+  let best = null, bv = -1;
+  for (const d of DIRS) {
+    const r = applyMove(g, d);
+    if (r.moved && r.gained > bv) { bv = r.gained; best = d; }
+  }
+  return best || brain1(g);
+}
+function brain3(g) { // 486: 점수 + 빈 칸
+  let best = null, bv = -Infinity;
+  for (const d of DIRS) {
+    const r = applyMove(g, d);
+    if (!r.moved) continue;
+    const v = r.gained * 10 + r.g.flat().filter(x => !x).length * 25;
+    if (v > bv) { bv = v; best = d; }
+  }
+  return best || brain2(g);
+}
+function brain4(g) { // Pentium: + 최대 타일 코너 배치
+  let best = null, bv = -Infinity;
+  for (const d of DIRS) {
+    const r = applyMove(g, d);
+    if (!r.moved) continue;
+    const v = r.gained * 10 + heur(r.g, true);
+    if (v > bv) { bv = v; best = d; }
+  }
+  return best || brain3(g);
+}
+function bestSecondValue(g) { // 브루트포스 2수째 최댓값
+  let bv = -Infinity;
+  for (const d of DIRS) {
+    const r = applyMove(g, d);
+    if (!r.moved) continue;
+    const v = r.gained * 10 + heur(r.g, true);
+    if (v > bv) bv = v;
+  }
+  return bv;
+}
+function brain5(g) { // M4 Max: 상대(2 생성)까지 시뮬레이션한 2수 전망
+  let best = null, bv = -Infinity;
+  for (const d of DIRS) {
+    const r = applyMove(g, d);
+    if (!r.moved) continue;
+    const empties = [];
+    for (let rr = 0; rr < SIZE; rr++) for (let cc = 0; cc < SIZE; cc++) if (!r.g[rr][cc]) empties.push([rr, cc]);
+    let sum = 0, n = 0;
+    for (const [rr, cc] of empties) {
+      const g2 = r.g.map(row => row.slice());
+      g2[rr][cc] = 2;
+      sum += bestSecondValue(g2);
+      n++;
+    }
+    const v = n ? sum / n : bestSecondValue(r.g);
+    if (v > bv) { bv = v; best = d; }
+  }
+  return best || brain4(g);
+}
+
+const CPUS = {
+  mw: { name: '🍲 전자레인지',  spec: '700 W 회전판 · 깊이 0 · 2000ms/수', ms: 2000, brain: brain0 },
+  ph: { name: '📱 피처폰',     spec: '2005 ARM9 폴더폰 · 깊이 1 · 1200ms/수', ms: 1200, brain: brain1 },
+  tv: { name: '📺 스마트 TV',  spec: '2010 듀얼코어 TV · 깊이 2 · 800ms/수',  ms: 800,  brain: brain2 },
+  om: { name: '📱 옴니아',     spec: '2008 Marvell 624MHz · 깊이 3 · 450ms/수', ms: 450, brain: brain3 },
+  gs: { name: '📱 아이폰 3GS', spec: '2009 Cortex-A8 · 깊이 4 · 220ms/수',  ms: 220,  brain: brain4 },
+  m4: { name: '🧠 M4 Max',     spec: '2026 풀가속 · 깊이 5 · 120ms/수',     ms: 120,  brain: brain5 },
+};
+let currentCpu = 'om';
+
+// ─── 게임 인스턴스 팩토리 ────────────────────────────────
+function createGame(cfg) { // {gridEl, rng, onChange(info), onEnd(result)}
+  const cells = [];
+  for (let i = 0; i < SIZE * SIZE; i++) {
+    const d = document.createElement('div');
+    d.className = 'cell';
+    cfg.gridEl.appendChild(d);
+    cells.push(d);
+  }
+  let grid = emptyGrid(), score = 0, moves = 0, dead = false, won = false;
+  spawnRng(grid, cfg.rng); spawnRng(grid, cfg.rng);
+
+  function render() {
+    for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+      const v = grid[r][c];
+      const el = cells[r * SIZE + c];
+      el.textContent = v || '';
+      el.className = 'cell' + (v ? (v > 2048 ? ' tile-super' : ' tile-' + v) : '');
+    }
+  }
+  function move(dir) {
+    if (dead || won) return { moved: false };
+    const res = applyMove(grid, dir);
+    if (!res.moved) return { moved: false };
+    grid = res.g;
+    score += res.gained;
+    moves++;
+    spawnRng(grid, cfg.rng);
+    render();
+    const mx = maxTile(grid);
+    if (mx >= 2048) { won = true; cfg.onEnd({ type: 'won', score, moves, maxTile: mx }); }
+    else if (!canMove(grid)) { dead = true; cfg.onEnd({ type: 'dead', score, moves, maxTile: mx }); }
+    cfg.onChange({ score, moves, maxTile: mx });
+    return { moved: true };
+  }
+  render();
+  return {
+    move,
+    info: () => ({ score, moves, maxTile: maxTile(grid) }),
+    snapshot: () => grid.map(row => row.slice()),
+    get dead() { return dead; },
+    get won() { return won; },
+  };
+}
+
+// ─── 대결 진행 ──────────────────────────────────────────
+const $ = id => document.getElementById(id);
+const aiScoreEl = $('aiScore'), huScoreEl = $('huScore');
+const aiMiniEl = $('aiMini'), huMiniEl = $('huMini');
+const aiOverlay = $('aiOverlay'), huOverlay = $('huOverlay');
+const statusEl = $('status');
+let aiGame = null, humanGame = null, aiTimer = null;
+let finished = false, raceStarted = false;
+
+function stopAiTimer() { if (aiTimer) { clearInterval(aiTimer); aiTimer = null; } }
+
+// 버그 수정(1): AI가 둘 곳이 없어도 게임이 멈춘 채 끝나지 않던 문제
+// 버그 수정(2): 40수 동안 점수가 그대로면 경색(교착)으로 판단하고 병합 우선 수로 강제 전환 — 모든 CPU 등급에 적용
+let aiStallCount = 0, aiLastScore = 0;
+function aiStep() {
+  if (finished) return;
+  const snap = aiGame.snapshot();
+  const info = aiGame.info();
+  if (info.score === aiLastScore) aiStallCount++; else { aiStallCount = 0; aiLastScore = info.score; }
+  let dir;
+  if (aiStallCount >= 40) dir = brain2(snap) || CPUS[currentCpu].brain(snap);
+  else dir = CPUS[currentCpu].brain(snap);
+  if (dir) { aiGame.move(dir); return; }
+  const anyMove = DIRS.some(d => applyMove(snap, d).moved);
+  if (!anyMove) onEnd('ai', { type: 'dead', score: info.score, moves: info.moves, maxTile: info.maxTile });
+}
+
+function startRace() {
+  raceStarted = true;
+  stopAiTimer();
+  aiTimer = setInterval(aiStep, CPUS[currentCpu].ms);
+  setStatus('<b>대결 시작!</b> ' + CPUS[currentCpu].name + '가 달려갑니다 — 당신도 서두르세요!');
+}
+
+function setStatus(html) { statusEl.innerHTML = html; }
+
+function onEnd(side, result) {
+  if (finished) return;
+  finished = true;
+  stopAiTimer();
+  const winner = result.type === 'won' ? side : (side === 'ai' ? 'human' : 'ai');
+  const how = result.type === 'won' ? '먼저 <b>2048 달성</b>' : '상대 <b>게임오버</b>';
+  if (winner === 'ai') {
+    aiOverlay.textContent = '🏆 승리!';
+    aiOverlay.className = 'overlay win';
+    huOverlay.textContent = side === 'human' && result.type === 'won' ? '아깝다…' : '💀 게임오버';
+    huOverlay.className = 'overlay lose';
+    if (currentCpu === 'mw') {
+      setStatus('<b>🍲 전자레인지에게 졌습니다…</b> 밥 데우다 병합까지 당했다니. 진정하세요.');
+    } else {
+      setStatus('<b>🤖 ' + CPUS[currentCpu].name + ' 승리!</b> (' + how + ') — CPU 등급을 낮추고 복수하세요');
+    }
+  } else {
+    huOverlay.textContent = '🏆 승리!';
+    huOverlay.className = 'overlay win';
+    aiOverlay.textContent = '💀 패배';
+    aiOverlay.className = 'overlay lose';
+    if (currentCpu === 'mw') {
+      setStatus('<b>🧑 전자레인지를 이겼습니다!</b> 물리적으로 당연한 결과죠. 이제 286부터 진짜 도전!');
+    } else {
+      setStatus('<b>🧑 당신 승리!</b> (' + how + ') — ' + CPUS[currentCpu].name + '를 이겼습니다!');
+    }
+  }
+}
+
+function newMatch() {
+  stopAiTimer();
+  finished = false; raceStarted = false;
+  aiStallCount = 0; aiLastScore = 0;
+  aiOverlay.className = 'overlay'; huOverlay.className = 'overlay';
+  $('aiGrid').innerHTML = ''; $('huGrid').innerHTML = '';
+  const seed = (Math.random() * 2 ** 31) | 0;
+  aiGame = createGame({
+    gridEl: $('aiGrid'), rng: mulberry32(seed),
+    onChange: i => { aiScoreEl.textContent = i.score; aiMiniEl.textContent = i.moves + '수 · 최대 타일 ' + i.maxTile; },
+    onEnd: r => onEnd('ai', r),
+  });
+  humanGame = createGame({
+    gridEl: $('huGrid'), rng: mulberry32(seed),
+    onChange: i => { huScoreEl.textContent = i.score; huMiniEl.textContent = i.moves + '수 · 최대 타일 ' + i.maxTile; },
+    onEnd: r => onEnd('human', r),
+  });
+  aiScoreEl.textContent = '0'; huScoreEl.textContent = '0';
+  aiMiniEl.textContent = '당신의 첫 수를 기다리는 중…';
+  huMiniEl.textContent = '방향키를 눌러 시작!';
+  setStatus('새 대결 준비 완료 (AI CPU: <b>' + CPUS[currentCpu].name + '</b>) — 방향키를 누르는 순간 시작됩니다');
+}
+
+function humanInput(dir) {
+  if (finished) return;
+  if (!raceStarted) startRace();
+  humanGame.move(dir);
+}
+
+document.querySelectorAll('.arrows button').forEach(b =>
+  b.addEventListener('click', () => humanInput(b.dataset.dir)));
+window.addEventListener('keydown', e => {
+  const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+  if (map[e.key]) { e.preventDefault(); humanInput(map[e.key]); }
+});
+$('newMatch').addEventListener('click', newMatch);
+document.querySelectorAll('.cpu').forEach(b =>
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.cpu').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    currentCpu = b.dataset.cpu;
+    $('cpuName').textContent = CPUS[currentCpu].name;
+    $('cpuSpec').textContent = CPUS[currentCpu].spec;
+    if (raceStarted && !finished) startRace(); // 진행 중이면 새 속도로 즉시 재시작
+    setStatus('AI CPU 교체 완료: <b>' + CPUS[currentCpu].name + '</b> (' + CPUS[currentCpu].spec + ')');
+  }));
+
+newMatch();
+</script>
+<script>
+// 규칙 모달
+const ruleModal = document.getElementById('ruleModal');
+document.getElementById('ruleBtn').addEventListener('click', () => ruleModal.classList.add('open'));
+document.getElementById('ruleClose').addEventListener('click', () => ruleModal.classList.remove('open'));
+ruleModal.addEventListener('click', e => { if (e.target === ruleModal) ruleModal.classList.remove('open'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') ruleModal.classList.remove('open'); });
+</script>
+</body>
+</html>

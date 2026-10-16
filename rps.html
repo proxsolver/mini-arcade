@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>가위바위보 심리전 — ZCode 데모</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --text:#e8eaf2; --sub:#9aa1b5; --accent:#7c8cf8; --human:#4fd08a; --ai:#e0645c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .app { width:720px; }
+  header { text-align:center; margin-bottom:8px; }
+  header h1 { font-size:28px; }
+  header h1 .ai { color:var(--ai); } header h1 .hu { color:var(--human); }
+  header h1 .vs { font-size:18px; color:var(--sub); margin:0 8px; }
+  .rules { color:var(--sub); font-size:13px; margin-top:6px; }
+  .rules b { color:var(--text); }
+  .scoreboard { display:flex; justify-content:center; gap:60px; align-items:center; margin-top:16px; }
+  .sb { text-align:center; }
+  .sb .name { font-size:14px; font-weight:700; }
+  #aiName { color:var(--ai); } #huName { color:var(--human); }
+  .sb .spec { font-size:11px; color:var(--sub); margin-top:2px; font-family:'Consolas','Courier New',monospace; min-height:14px; }
+  .sb .pts { font-size:40px; font-weight:900; font-variant-numeric:tabular-nums; }
+  .vsline { font-size:20px; color:var(--sub); font-weight:800; }
+  .hands { display:flex; justify-content:center; gap:70px; align-items:center; margin-top:18px; }
+  .hand { width:120px; height:120px; background:var(--panel); border-radius:18px; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; font-size:56px; border:2px solid transparent; }
+  .hand.picked { border-color:#454c68; }
+  .hand-label { font-size:12px; color:var(--sub); margin-top:6px; text-align:center; }
+  .result { text-align:center; margin-top:14px; font-size:22px; font-weight:900; min-height:30px; }
+  .result.win { color:#ffd24d; } .result.lose { color:#8b93a8; } .result.draw { color:var(--sub); }
+  .predict { text-align:center; color:var(--sub); font-size:13px; min-height:18px; margin-top:2px; }
+  .predict b { color:var(--ai); }
+  .throws { display:flex; gap:14px; justify-content:center; margin-top:20px; }
+  .throw { width:96px; height:96px; border-radius:16px; background:var(--panel); border:2px solid #454c68;
+    font-size:44px; cursor:pointer; color:var(--text); }
+  .throw:hover { border-color:var(--accent); transform:translateY(-3px); }
+  .throw:disabled { opacity:.35; cursor:default; transform:none; }
+  .controls { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:18px; flex-wrap:wrap; }
+  button { border:0; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; }
+  #newMatch, #ruleBtn { background:#3a4060; }
+  .cpu { font-family:'Consolas','Courier New',monospace; background:#2c3145; border:1px solid #454c68;
+    padding:8px 12px; font-size:13px; line-height:1.2; text-align:left; }
+  .cpu small { display:block; font-size:10px; opacity:.65; font-weight:400; }
+  .cpu.active { background:var(--accent); border-color:var(--accent); }
+  .cpu-label { color:var(--sub); font-size:13px; }
+  .status { margin-top:12px; text-align:center; font-size:15px; color:var(--sub); min-height:22px; }
+  .status b { color:var(--text); }
+  .history { text-align:center; margin-top:8px; font-size:13px; color:var(--sub); letter-spacing:2px; min-height:18px; }
+  .back { margin-top:10px; text-align:center; }
+  .back a { color:var(--sub); font-size:13px; text-decoration:none; border-bottom:1px solid #454c68; }
+  footer { margin-top:8px; color:var(--sub); font-size:11px; text-align:center; }
+  .modal { position:fixed; inset:0; background:rgba(12,14,22,.78); display:none; align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .modal.open { display:flex; }
+  .modal-box { background:var(--panel); border:1px solid #454c68; border-radius:18px; max-width:560px; width:100%;
+    max-height:86vh; overflow-y:auto; padding:24px 26px; font-size:14.5px; line-height:1.65; color:var(--sub); }
+  .modal-box h3 { font-size:19px; color:var(--text); margin-bottom:10px; }
+  .modal-box b { color:var(--accent); }
+  .modal-box .close { float:right; background:#3a4060; border-radius:8px; padding:6px 12px; cursor:pointer; color:var(--text); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="ai">🤖 AI</span><span class="vs">VS</span><span class="hu">🧑 나</span> <span style="font-size:20px;color:var(--sub)">— 가위바위보 심리전</span></h1>
+    <p class="rules"><b>5승 먼저</b> · AI는 당신의 패턴을 읽어 <b>예측</b>합니다 · 무승부는 판 다시</p>
+  </header>
+
+  <div class="scoreboard">
+    <div class="sb"><div class="name" id="aiName">🤖 AI</div><div class="spec" id="cpuSpec">2008 624MHz · 예측력 55%</div><div class="pts" id="aiPts">0</div></div>
+    <div class="vsline">VS</div>
+    <div class="sb"><div class="name" id="huName">🧑 나</div><div class="spec">생물학적 뉴런 860억 개</div><div class="pts" id="huPts">0</div></div>
+  </div>
+
+  <div class="hands">
+    <div><div class="hand" id="aiHand">❔</div><div class="hand-label">AI의 선택</div></div>
+    <div><div class="hand" id="huHand">❔</div><div class="hand-label">나의 선택</div></div>
+  </div>
+  <div class="predict" id="predict">AI: 아직 데이터가 없어요…</div>
+  <div class="result" id="result">가위·바위·보 중 하나를 누르세요!</div>
+
+  <div class="throws">
+    <button class="throw" data-m="0">✌️</button>
+    <button class="throw" data-m="1">✊</button>
+    <button class="throw" data-m="2">🖐️</button>
+  </div>
+
+  <div class="controls">
+    <button id="newMatch">🔄 새 대결</button>
+    <button id="ruleBtn">📖 규칙</button>
+    <span class="cpu-label">AI CPU:</span>
+    <button class="cpu" data-cpu="mw">🍲 전자레인지<small>예측력 0%</small></button>
+    <button class="cpu" data-cpu="ph">📱 피처폰<small>예측력 15%</small></button>
+    <button class="cpu" data-cpu="tv">📺 스마트TV<small>예측력 30%</small></button>
+    <button class="cpu active" data-cpu="om">📱 옴니아<small>예측력 45%</small></button>
+    <button class="cpu" data-cpu="gs">📱 아이폰3GS<small>예측력 62%</small></button>
+    <button class="cpu" data-cpu="m4">🧠 M4 Max<small>예측력 80%</small></button>
+  </div>
+  <div class="status" id="status">연승 대결 — 먼저 <b>5승</b>하는 쪽이 승리합니다</div>
+  <div class="history" id="history"></div>
+  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <footer>제품별 연산력 = 패턴 예측력 · vanilla JS — 생성·실행·검증 ZCode</footer>
+
+  <div class="modal" id="ruleModal">
+    <div class="modal-box">
+      <button class="close" id="ruleClose">닫기 ✕</button>
+      <h3>✌️ 가위바위보 심리전 — 규칙</h3>
+      · ✌️✊🖐️ 버튼으로 동시에 냅니다. 이기면 1승, 비기면 판 다시 — <b>먼저 5승</b>하면 승리.<br>
+      · AI는 단순 난수가 아니라 <b>당신의 최근 패턴 빈도를 분석</b>해 다음 수를 예측하고, 예측한 수를 이기는 수를 냅니다. 매 판 뒤 AI의 예측이 공개됩니다.<br>
+      · CPU 등급 = <b>예측을 신뢰할 확률</b> — 전자레인지(0%·완전 랜덤) → 피처폰(15%) → 스마트TV(30%) → 옴니아(45%) → 아이폰3GS(62%) → M4 Max(80%·당신의 습관을 거의 다 읽음).<br><br>
+      💡 <b>전략</b>: 사람은 무의식적으로 <b>방금 이긴 손을 반복</b>하거나 <b>진 다음 세 손을 돌아가는</b> 경향이 있습니다. M4 Max 상대로는 이 습관이 곧 패배입니다 — 일부러 불규칙해지세요!
+    </div>
+  </div>
+</div>
+
+<script>
+const MOVES = ['✌️', '✊', '🖐️'];
+const NAMES = ['가위', '바위', '보'];
+const BEATS = [1, 2, 0]; // BEATS[i] = i를 이기는 수 (가위←바위, 바위←보, 보←가위)
+
+const CPUS = {
+  mw: { name: '🍲 전자레인지',  spec: '700 W · 예측력 0%',  p: 0.00 },
+  ph: { name: '📱 피처폰',     spec: '2005 ARM9 · 예측력 15%', p: 0.15 },
+  tv: { name: '📺 스마트 TV',  spec: '2010 듀얼코어 · 예측력 30%', p: 0.30 },
+  om: { name: '📱 옴니아',     spec: '2008 624MHz · 예측력 45%', p: 0.45 },
+  gs: { name: '📱 아이폰 3GS', spec: '2009 Cortex-A8 · 예측력 62%', p: 0.62 },
+  m4: { name: '🧠 M4 Max',     spec: '2026 풀가속 · 예측력 80%', p: 0.80 },
+};
+let currentCpu = 'om';
+
+let huPts = 0, aiPts = 0, over = false, busy = false;
+let history = []; // 내 최근 8수
+
+const huHand = document.getElementById('huHand'), aiHand = document.getElementById('aiHand');
+const resultEl = document.getElementById('result'), predictEl = document.getElementById('predict');
+const historyEl = document.getElementById('history');
+const throwBtns = document.querySelectorAll('.throw');
+
+function predictHuman() {
+  // 최근 히스토리 빈도 분석 → 가장 자주 낸 수를 낼 거라 예측
+  if (!history.length) return Math.floor(Math.random() * 3);
+  const cnt = [0, 0, 0];
+  const W = [1, 1.4, 1.9, 2.6, 3.4, 4.5, 5.6, 6.8]; // 최근 수일수록 가중치↑
+  for (let i = 0; i < history.length; i++) cnt[history[i]] += W[history.length - 1 - i] || 1;
+  return cnt.indexOf(Math.max(...cnt));
+}
+function aiMove() {
+  const pred = predictHuman();
+  const trust = Math.random() < CPUS[currentCpu].p;
+  predictEl.innerHTML = 'AI 예측: 당신은 <b>' + NAMES[pred] + '</b>를 낼 것' + (trust ? ' → 이를 겨냥' : ' (이번엔 안 믿음)');
+  return trust ? BEATS[pred] : Math.floor(Math.random() * 3);
+}
+function throwMove(m) {
+  if (busy || over) return;
+  busy = true;
+  throwBtns.forEach(b => b.disabled = true);
+  huHand.textContent = MOVES[m];
+  aiHand.textContent = '❔';
+  resultEl.textContent = '…';
+  resultEl.className = 'result';
+  // 도발 애니메이션
+  let shake = 0;
+  const iv = setInterval(() => {
+    huHand.textContent = shake % 2 ? '✊' : MOVES[m];
+    aiHand.textContent = shake % 2 ? '✊' : '❔';
+    if (++shake >= 3) {
+      clearInterval(iv);
+      const a = aiMove();
+      huHand.textContent = MOVES[m];
+      aiHand.textContent = MOVES[a];
+      history.push(m); if (history.length > 8) history.shift();
+      historyEl.textContent = history.map(h => MOVES[h]).join(' ');
+      if (a === m) {
+        resultEl.textContent = '🤝 무승부 — 다시!';
+        resultEl.className = 'result draw';
+      } else if (BEATS[m] === a) { // a는 m을 이기는 수
+        aiPts++; document.getElementById('aiPts').textContent = aiPts;
+        resultEl.textContent = '😖 ' + NAMES[a] + '에게 졌습니다';
+        resultEl.className = 'result lose';
+      } else {
+        huPts++; document.getElementById('huPts').textContent = huPts;
+        resultEl.textContent = '🎉 이겼습니다!';
+        resultEl.className = 'result win';
+      }
+      if (huPts >= 5 || aiPts >= 5) {
+        over = true;
+        resultEl.textContent = huPts >= 5 ? '🏆 당신 승리! ' + huPts + ' : ' + aiPts : '🤖 AI 승리 ' + aiPts + ' : ' + huPts;
+        resultEl.className = huPts >= 5 ? 'result win' : 'result lose';
+        document.getElementById('status').innerHTML = huPts >= 5
+          ? '<b>당신 승리!</b> 인간의 심리가 ' + CPUS[currentCpu].name + '을 이겼습니다'
+          : '<b>' + CPUS[currentCpu].name + ' 승리</b> — 당신의 패턴을 읽혔습니다. 등급을 낮추고 복수!';
+      } else {
+        busy = false;
+        throwBtns.forEach(b => b.disabled = false);
+      }
+    }
+  }, 220);
+}
+throwBtns.forEach(b => b.addEventListener('click', () => throwMove(+b.dataset.m)));
+document.getElementById('newMatch').addEventListener('click', () => {
+  huPts = 0; aiPts = 0; over = false; busy = false; history = [];
+  document.getElementById('huPts').textContent = 0;
+  document.getElementById('aiPts').textContent = 0;
+  huHand.textContent = '❔'; aiHand.textContent = '❔';
+  resultEl.textContent = '가위·바위·보 중 하나를 누르세요!';
+  resultEl.className = 'result';
+  predictEl.textContent = 'AI: 아직 데이터가 없어요…';
+  historyEl.textContent = '';
+  document.getElementById('status').innerHTML = '새 대결 (AI: <b>' + CPUS[currentCpu].name + '</b>) — 먼저 <b>5승</b>!';
+  throwBtns.forEach(b => b.disabled = false);
+});
+document.querySelectorAll('.cpu').forEach(btn =>
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cpu').forEach(x => x.classList.remove('active'));
+    btn.classList.add('active');
+    currentCpu = btn.dataset.cpu;
+    document.getElementById('aiName').textContent = '🤖 ' + CPUS[currentCpu].name;
+    document.getElementById('cpuSpec').textContent = CPUS[currentCpu].spec;
+    document.getElementById('status').innerHTML = 'AI 교체: <b>' + CPUS[currentCpu].name + '</b> (' + CPUS[currentCpu].spec + ')';
+  }));
+const ruleModal = document.getElementById('ruleModal');
+document.getElementById('ruleBtn').addEventListener('click', () => ruleModal.classList.add('open'));
+document.getElementById('ruleClose').addEventListener('click', () => ruleModal.classList.remove('open'));
+ruleModal.addEventListener('click', e => { if (e.target === ruleModal) ruleModal.classList.remove('open'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') ruleModal.classList.remove('open'); });
+</script>
+</body>
+</html>

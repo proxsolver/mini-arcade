@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>틱택토 AI 대결 — ZCode 데모</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --text:#e8eaf2; --sub:#9aa1b5; --accent:#7c8cf8; --human:#4fd08a; --ai:#e0645c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .app { width:720px; }
+  header { text-align:center; margin-bottom:8px; }
+  header h1 { font-size:28px; }
+  header h1 .ai { color:var(--ai); } header h1 .hu { color:var(--human); }
+  header h1 .vs { font-size:18px; color:var(--sub); margin:0 8px; }
+  .rules { color:var(--sub); font-size:13px; margin-top:6px; }
+  .rules b { color:var(--text); }
+  .arena { display:flex; gap:18px; justify-content:center; align-items:flex-start; margin-top:14px; }
+  .player-card { width:150px; background:var(--panel); border-radius:14px; padding:14px 12px; text-align:center; }
+  .player-card .tag { font-size:16px; font-weight:800; }
+  #aiCard .tag { color:var(--ai); } #huCard .tag { color:var(--human); }
+  .player-card .spec { font-size:11px; color:var(--sub); margin-top:4px; font-family:'Consolas','Courier New',monospace; min-height:28px; line-height:1.4; }
+  .wins { font-size:26px; font-weight:800; margin-top:10px; }
+  .wins small { display:block; font-size:11px; color:var(--sub); font-weight:400; }
+  .turn-dot { width:30px; height:30px; border-radius:50%; margin:10px auto 0; background:#3a4060; opacity:.35; }
+  #aiCard .turn-dot.active { background:var(--ai); opacity:1; box-shadow:0 0 14px var(--ai); }
+  #huCard .turn-dot.active { background:var(--human); opacity:1; box-shadow:0 0 14px var(--human); }
+  .board-wrap { position:relative; }
+  #board { display:grid; grid-template-columns:repeat(3, 110px); gap:8px; background:var(--panel); padding:10px; border-radius:14px; }
+  .cell { width:110px; height:110px; background:#1f2333; border-radius:10px; display:flex; align-items:center;
+    justify-content:center; font-size:56px; font-weight:900; cursor:pointer; }
+  .cell.x { color:var(--human); cursor:default; }
+  .cell.o { color:var(--ai); cursor:default; }
+  .cell.winline { box-shadow:0 0 0 4px #ffd24d, 0 0 18px #ffd24d; }
+  .overlay { position:absolute; inset:0; background:rgba(18,20,32,.86); display:none; align-items:center;
+    justify-content:center; border-radius:14px; font-size:24px; font-weight:900; z-index:5; text-align:center; }
+  .overlay.win { display:flex; color:#ffd24d; }
+  .overlay.lose { display:flex; color:#8b93a8; }
+  .overlay.draw { display:flex; color:var(--sub); }
+  .controls { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+  button { border:0; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; }
+  #newMatch, #ruleBtn { background:#3a4060; }
+  .cpu { font-family:'Consolas','Courier New',monospace; background:#2c3145; border:1px solid #454c68;
+    padding:8px 12px; font-size:13px; line-height:1.2; text-align:left; }
+  .cpu small { display:block; font-size:10px; opacity:.65; font-weight:400; }
+  .cpu.active { background:var(--accent); border-color:var(--accent); }
+  .cpu-label { color:var(--sub); font-size:13px; }
+  .status { margin-top:12px; text-align:center; font-size:15px; color:var(--sub); min-height:22px; }
+  .status b { color:var(--text); }
+  .back { margin-top:10px; text-align:center; }
+  .back a { color:var(--sub); font-size:13px; text-decoration:none; border-bottom:1px solid #454c68; }
+  footer { margin-top:8px; color:var(--sub); font-size:11px; text-align:center; }
+  .modal { position:fixed; inset:0; background:rgba(12,14,22,.78); display:none; align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .modal.open { display:flex; }
+  .modal-box { background:var(--panel); border:1px solid #454c68; border-radius:18px; max-width:560px; width:100%;
+    max-height:86vh; overflow-y:auto; padding:24px 26px; font-size:14.5px; line-height:1.65; color:var(--sub); }
+  .modal-box h3 { font-size:19px; color:var(--text); margin-bottom:10px; }
+  .modal-box b { color:var(--accent); }
+  .modal-box .close { float:right; background:#3a4060; border-radius:8px; padding:6px 12px; cursor:pointer; color:var(--text); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="ai">🤖 AI</span><span class="vs">VS</span><span class="hu">🧑 나</span> <span style="font-size:20px;color:var(--sub)">— 틱택토</span></h1>
+    <p class="rules">가로·세로·대각선 <b>3칸 먼저</b> 연결하면 승리 · 당신 <b>X 선공</b> · 최강 등급은 <b>완벽 방어</b>라 절대 안 집니다</p>
+  </header>
+
+  <div class="arena">
+    <div class="player-card" id="aiCard">
+      <div class="tag">🤖 <span id="cpuName">📱 옴니아</span></div>
+      <div class="spec" id="cpuSpec">2008 624MHz · 최적수 65%</div>
+      <div class="wins" id="aiWins">0<small>AI 승리</small></div>
+      <div class="turn-dot" id="aiDot"></div>
+    </div>
+    <div class="board-wrap">
+      <div id="board"></div>
+      <div class="overlay" id="overlay"></div>
+    </div>
+    <div class="player-card" id="huCard">
+      <div class="tag">🧑 나 (X)</div>
+      <div class="spec">생물학적 뉴런 860억 개</div>
+      <div class="wins" id="huWins">0<small>내 승리</small></div>
+      <div class="turn-dot active" id="huDot"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="newMatch">🔄 새 대국</button>
+    <button id="ruleBtn">📖 규칙</button>
+    <span class="cpu-label">AI CPU:</span>
+    <button class="cpu" data-cpu="mw">🍲 전자레인지<small>최적수 10%</small></button>
+    <button class="cpu" data-cpu="ph">📱 피처폰<small>최적수 25%</small></button>
+    <button class="cpu" data-cpu="tv">📺 스마트TV<small>최적수 45%</small></button>
+    <button class="cpu active" data-cpu="om">📱 옴니아<small>최적수 65%</small></button>
+    <button class="cpu" data-cpu="gs">📱 아이폰3GS<small>최적수 85%</small></button>
+    <button class="cpu" data-cpu="m4">🧠 M4 Max<small>최적수 100%</small></button>
+  </div>
+  <div class="status" id="status">당신 차례 — 빈 칸을 클릭하세요 (X)</div>
+  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <footer>제품별 연산력 = 완벽한 수를 둘 확률 · vanilla JS — 생성·실행·검증 ZCode</footer>
+
+  <div class="modal" id="ruleModal">
+    <div class="modal-box">
+      <button class="close" id="ruleClose">닫기 ✕</button>
+      <h3>⭕ 틱택토 — 규칙</h3>
+      · 3×3 판에서 가로·세로·대각선 <b>3칸을 먼저 연결</b>하면 승리. 모든 칸이 차면 무승부입니다.<br>
+      · 당신(<b style="color:#4fd08a">X</b>)이 선공, AI(<b style="color:#e0645c">O</b>)이 후공. 빈 칸을 클릭해 둡니다.<br>
+      · CPU 등급 = AI가 <b>미니맥스 최적수를 둘 확률</b> — 전자레인지(10%)는 거의 아무거나 두고, <b>M4 Max(100%)는 완벽하게 play</b>해서 지지 않습니다(최선 무승부).<br><br>
+      💡 <b>전략</b>: 선공은 <b>모서리나 중앙</b>부터. 3GS 이상은 당신의 승리 수를 전부 막으니, 무승부를 노리는 게 정상입니다.
+    </div>
+  </div>
+</div>
+
+<script>
+const HU = 'X', AI = 'O';
+const boardEl = document.getElementById('board');
+const overlay = document.getElementById('overlay');
+const statusEl = document.getElementById('status');
+const cells = [];
+for (let i = 0; i < 9; i++) {
+  const d = document.createElement('div');
+  d.className = 'cell';
+  d.addEventListener('click', () => humanClick(i));
+  boardEl.appendChild(d);
+  cells.push(d);
+}
+const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+function winner(b) {
+  for (const L of LINES) if (b[L[0]] && b[L[0]] === b[L[1]] && b[L[1]] === b[L[2]]) return { p: b[L[0]], line: L };
+  return null;
+}
+const full = b => b.every(Boolean);
+
+// 완벽한 수: 미니맥스 (O 관점)
+function minimax(b, turn) {
+  const w = winner(b);
+  if (w) return { score: w.p === AI ? 10 : -10 };
+  if (full(b)) return { score: 0 };
+  let best = { score: turn === AI ? -99 : 99, idx: -1 };
+  for (let i = 0; i < 9; i++) {
+    if (b[i]) continue;
+    b[i] = turn;
+    const s = minimax(b, turn === AI ? HU : AI).score;
+    b[i] = null;
+    if ((turn === AI && s > best.score) || (turn === HU && s < best.score)) best = { score: s, idx: i };
+  }
+  return best;
+}
+
+const CPUS = {
+  mw: { name: '🍲 전자레인지',  spec: '700 W · 최적수 10%', p: 0.10 },
+  ph: { name: '📱 피처폰',     spec: '2005 ARM9 · 최적수 25%', p: 0.25 },
+  tv: { name: '📺 스마트 TV',  spec: '2010 듀얼코어 · 최적수 45%', p: 0.45 },
+  om: { name: '📱 옴니아',     spec: '2008 624MHz · 최적수 65%', p: 0.65 },
+  gs: { name: '📱 아이폰 3GS', spec: '2009 Cortex-A8 · 최적수 85%', p: 0.85 },
+  m4: { name: '🧠 M4 Max',     spec: '2026 풀가속 · 최적수 100%', p: 1.0 },
+};
+let currentCpu = 'om';
+let b, over, locked, huWins = 0, aiWins = 0;
+
+function setStatus(html) { statusEl.innerHTML = html; }
+function setDots(t) {
+  document.getElementById('huDot').className = 'turn-dot' + (t === 'hu' && !over ? ' active' : '');
+  document.getElementById('aiDot').className = 'turn-dot' + (t === 'ai' && !over ? ' active' : '');
+}
+function render() {
+  for (let i = 0; i < 9; i++) {
+    cells[i].textContent = b[i] || '';
+    cells[i].className = 'cell' + (b[i] === HU ? ' x' : b[i] === AI ? ' o' : '');
+  }
+}
+function endMatch(w, line) {
+  over = true; locked = true;
+  if (line) for (const i of line) cells[i].classList.add('winline');
+  if (!w) {
+    overlay.textContent = '🤝 무승부';
+    overlay.className = 'overlay draw';
+    setStatus('<b>무승부!</b> 틱택토를 제대로 알고 계시네요');
+  } else if (w === HU) {
+    huWins++; document.getElementById('huWins').innerHTML = huWins + '<small>내 승리</small>';
+    overlay.textContent = '🏆 당신 승리!';
+    overlay.className = 'overlay win';
+    setStatus('<b>당신 승리!</b> ' + CPUS[currentCpu].name + '를 꺾었습니다!');
+  } else {
+    aiWins++; document.getElementById('aiWins').innerHTML = aiWins + '<small>AI 승리</small>';
+    overlay.textContent = '🤖 AI 승리';
+    overlay.className = 'overlay lose';
+    setStatus('<b>' + CPUS[currentCpu].name + ' 승리</b> — 등급을 낮추고 복수하세요');
+  }
+  setDots(null);
+}
+function aiTurn() {
+  locked = true; setDots('ai');
+  setTimeout(() => {
+    if (over) return;
+    const empties = [];
+    for (let i = 0; i < 9; i++) if (!b[i]) empties.push(i);
+    let idx;
+    if (Math.random() < CPUS[currentCpu].p) idx = minimax(b.slice(), AI).idx;
+    else idx = empties[Math.floor(Math.random() * empties.length)];
+    b[idx] = AI;
+    render();
+    const w = winner(b);
+    if (w) { endMatch(w.p, w.line); return; }
+    if (full(b)) { endMatch(null); return; }
+    locked = false; setDots('hu');
+    setStatus('당신 차례 — 빈 칸을 클릭하세요 (X)');
+  }, 300 + Math.random() * 400);
+}
+function humanClick(i) {
+  if (locked || over || b[i]) return;
+  b[i] = HU;
+  render();
+  const w = winner(b);
+  if (w) { endMatch(w.p, w.line); return; }
+  if (full(b)) { endMatch(null); return; }
+  aiTurn();
+}
+function newMatch() {
+  b = Array(9).fill(null); over = false; locked = false;
+  overlay.className = 'overlay'; overlay.textContent = '';
+  render(); setDots('hu');
+  setStatus('새 대국 (AI: <b>' + CPUS[currentCpu].name + '</b> · 최적수 ' + Math.round(CPUS[currentCpu].p * 100) + '%) — 당신 선공');
+}
+document.querySelectorAll('.cpu').forEach(btn =>
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.cpu').forEach(x => x.classList.remove('active'));
+    btn.classList.add('active');
+    currentCpu = btn.dataset.cpu;
+    document.getElementById('cpuName').textContent = CPUS[currentCpu].name;
+    document.getElementById('cpuSpec').textContent = CPUS[currentCpu].spec;
+    setStatus('AI 교체: <b>' + CPUS[currentCpu].name + '</b> (' + CPUS[currentCpu].spec + ')');
+  }));
+document.getElementById('newMatch').addEventListener('click', newMatch);
+const ruleModal = document.getElementById('ruleModal');
+document.getElementById('ruleBtn').addEventListener('click', () => ruleModal.classList.add('open'));
+document.getElementById('ruleClose').addEventListener('click', () => ruleModal.classList.remove('open'));
+ruleModal.addEventListener('click', e => { if (e.target === ruleModal) ruleModal.classList.remove('open'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') ruleModal.classList.remove('open'); });
+newMatch();
+</script>
+</body>
+</html>

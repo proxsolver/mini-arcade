@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오셀로(리버시) AI 대결 — ZCode 데모</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --cellbg:#1f6e46; --text:#e8eaf2; --sub:#9aa1b5;
+    --accent:#7c8cf8; --human:#22262f; --ai:#e8eaf2; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .app { width:820px; }
+  header { text-align:center; margin-bottom:8px; }
+  header h1 { font-size:28px; }
+  header h1 .ai { color:#cfd6e4; }
+  header h1 .hu { color:#8d97ad; }
+  header h1 .vs { font-size:18px; color:var(--sub); margin:0 8px; }
+  .rules { color:var(--sub); font-size:13px; margin-top:6px; }
+  .rules b { color:var(--text); }
+  .arena { display:flex; gap:16px; justify-content:center; align-items:flex-start; margin-top:14px; }
+  .player-card { width:160px; background:var(--panel); border-radius:14px; padding:14px 12px; text-align:center; }
+  .player-card .tag { font-size:16px; font-weight:800; }
+  #aiCard .tag { color:#cfd6e4; }
+  #huCard .tag { color:#8d97ad; }
+  .player-card .spec { font-size:11px; color:var(--sub); margin-top:4px; font-family:'Consolas','Courier New',monospace; min-height:14px; }
+  .stones { display:flex; gap:8px; justify-content:center; margin-top:12px; align-items:center; }
+  .stone { width:26px; height:26px; border-radius:50%; display:inline-block; }
+  .stone.b { background:var(--human); border:2px solid #3a4152; }
+  .stone.w { background:var(--ai); border:2px solid #b8c0d4; }
+  .count { font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; }
+  .turn-ring { width:34px; height:34px; border-radius:50%; margin:10px auto 0; border:3px solid transparent; opacity:.35; }
+  #aiCard .turn-ring { background:var(--ai); }
+  #huCard .turn-ring { background:var(--human); }
+  #aiCard .turn-ring.active { opacity:1; box-shadow:0 0 14px #cfd6e4; border-color:#fff; }
+  #huCard .turn-ring.active { opacity:1; box-shadow:0 0 14px #8d97ad; border-color:#fff; }
+  .board-wrap { position:relative; }
+  #board { display:grid; grid-template-columns:repeat(8, 54px); gap:4px; background:#155238;
+    padding:8px; border-radius:12px; }
+  .sq { width:54px; height:54px; background:var(--cellbg); border-radius:6px; cursor:pointer; position:relative; }
+  .sq:hover.hint { box-shadow:inset 0 0 0 3px var(--accent); }
+  .sq .disc { position:absolute; inset:6px; border-radius:50%; animation:pop .18s ease-out; }
+  .sq .disc.b { background:var(--human); border:2px solid #3a4152; }
+  .sq .disc.w { background:var(--ai); border:2px solid #b8c0d4; }
+  .sq .dot { position:absolute; inset:19px; border-radius:50%; background:rgba(124,140,248,.55); display:none; }
+  .sq.hint .dot { display:block; }
+  .sq.last::after { content:""; position:absolute; inset:0; border-radius:6px; box-shadow:inset 0 0 0 3px #ffd24d; }
+  @keyframes pop { from { transform:scale(.4); } to { transform:scale(1); } }
+  .overlay { position:absolute; inset:0; background:rgba(18,20,32,.87); display:none; align-items:center;
+    justify-content:center; border-radius:12px; font-size:26px; font-weight:900; z-index:5; text-align:center; line-height:1.5; }
+  .overlay.win { display:flex; color:#ffd24d; }
+  .overlay.lose { display:flex; color:#8b93a8; }
+  .overlay.draw { display:flex; color:var(--sub); }
+  .controls { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+  button { border:0; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; }
+  #newMatch { background:#3a4060; }
+  .cpu { font-family:'Consolas','Courier New',monospace; background:#2c3145; border:1px solid #454c68;
+    padding:8px 12px; font-size:13px; line-height:1.2; text-align:left; }
+  .cpu small { display:block; font-size:10px; opacity:.65; font-weight:400; }
+  .cpu.active { background:var(--accent); border-color:var(--accent); }
+  .cpu-label { color:var(--sub); font-size:13px; }
+  .status { margin-top:12px; text-align:center; font-size:15px; color:var(--sub); min-height:22px; }
+  .status b { color:var(--text); }
+  #ruleBtn { background:#3a4060; }
+  .modal { position:fixed; inset:0; background:rgba(12,14,22,.78); display:none;
+    align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .modal.open { display:flex; }
+  .modal-box { background:var(--panel); border:1px solid #454c68; border-radius:18px; max-width:560px;
+    width:100%; max-height:86vh; overflow-y:auto; padding:24px 26px; font-size:14.5px; line-height:1.65; color:var(--sub); }
+  .modal-box h3 { font-size:19px; color:var(--text); margin-bottom:10px; }
+  .modal-box b { color:var(--accent); }
+  .modal-box .close { float:right; background:#3a4060; border-radius:8px; padding:6px 12px; cursor:pointer;
+    color:var(--text); font-size:13px; }
+  .back { margin-top:10px; text-align:center; }
+  .back a { color:var(--sub); font-size:13px; text-decoration:none; border-bottom:1px solid #454c68; }
+  footer { margin-top:8px; color:var(--sub); font-size:11px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="ai">⚪ AI</span><span class="vs">VS</span><span class="hu">⚫ 나</span> <span style="font-size:20px;color:var(--sub)">— 오셀로(리버시)</span></h1>
+    <p class="rules">상대 돌을 <b>양쪽에서 끼워 잡아</b> 뒤집습니다 · 최종 <b>돌이 많은 쪽</b>이 승리 · 당신 <b>선공(흑)</b> · 파란 점이 둘 수 있는 곳</p>
+  </header>
+
+  <div class="arena">
+    <div class="player-card" id="aiCard">
+      <div class="tag">⚪ <span id="cpuName">📱 옴니아</span></div>
+      <div class="spec" id="cpuSpec">2008 624MHz · 깊이 3</div>
+      <div class="stones"><span class="stone w"></span><span class="count" id="wCount">2</span></div>
+      <div class="turn-ring" id="aiRing"></div>
+    </div>
+
+    <div class="board-wrap">
+      <div id="board"></div>
+      <div class="overlay" id="overlay"></div>
+    </div>
+
+    <div class="player-card" id="huCard">
+      <div class="tag">⚫ 나</div>
+      <div class="spec">생물학적 뉴런 860억 개</div>
+      <div class="stones"><span class="stone b"></span><span class="count" id="bCount">2</span></div>
+      <div class="turn-ring active" id="huRing"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="newMatch">🔄 새 대국</button>
+    <button id="ruleBtn">📖 규칙</button>
+    <span class="cpu-label">AI CPU:</span>
+    <button class="cpu" data-cpu="mw">🍲 전자레인지<small>700W · 깊이 0</small></button>
+    <button class="cpu" data-cpu="ph">📱 피처폰<small>ARM9 · 깊이 1</small></button>
+    <button class="cpu" data-cpu="tv">📺 스마트TV<small>듀얼코어 · 깊이 2</small></button>
+    <button class="cpu active" data-cpu="om">📱 옴니아<small>624MHz · 깊이 3</small></button>
+    <button class="cpu" data-cpu="gs">📱 아이폰3GS<small>Cortex-A8 · 깊이 4</small></button>
+    <button class="cpu" data-cpu="m4">🧠 M4 Max<small>2026 · 깊이 5</small></button>
+  </div>
+  <div class="status" id="status">당신 차례 — 파란 점이 있는 칸을 클릭하세요</div>
+  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <footer>미니맥스 + 알파베타 + 코너/기동력 가중 평가 · vanilla JS 단일 파일 — 생성·실행·검증 ZCode</footer>
+
+  <div class="modal" id="ruleModal">
+    <div class="modal-box">
+      <button class="close" id="ruleClose">닫기 ✕</button>
+      <h3>⚪ 오셀로 리버시 — 규칙</h3>
+      · 상대 돌을 <b>양쪽에서 내 돌로 끼우면</b> 가운데 끼인 돌들이 전부 내 색으로 뒤집힙니다.<br>
+      · 당신(<b>⚫ 흑</b>)이 <b>선공</b>, AI(<b>⚪ 백</b>)이 후공. 둘 수 있는 칸은 <b>파란 점</b>으로 표시됩니다.<br>
+      · 둘 곳이 없으면 <b>자동으로 패스</b>하며, 양쪽 모두 둘 곳이 없으면 대국이 끝납니다.<br>
+      · 최종적으로 <b>돌이 더 많은 쪽이 승리</b>. 마지막 착수 위치는 금색 테두리로 표시됩니다.<br>
+      · CPU 등급 = 미니맥스 탐색 깊이(0~5). 평가함수는 <b>코너·모서리·기동력·X칸 위험도</b>까지 반영합니다 — Pentium 이상은 코너를 절대 내주지 않습니다.<br><br>
+      💡 <b>전략</b>: <b>코너는 절대 빼앗기지 마세요</b> — 코너의 돌은 영원히 뒤집히지 않습니다. 코너 대각선 안쪽(X칸)은 상대에게 코너를 헌납하는 위험 지역이므로 초반엔 피하세요. 중반에 돌이 적어도 겁먹지 마세요, 오셀로는 <b>막판 뒤집기</b>의 게임입니다.
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── 보드 ───────────────────────────────────────────────
+const N = 8;
+const EMPTY = 0, BLACK = 1, WHITE = 2; // 사람=흑(선공), AI=백
+const boardEl = document.getElementById('board');
+const overlay = document.getElementById('overlay');
+const statusEl = document.getElementById('status');
+const bCountEl = document.getElementById('bCount'), wCountEl = document.getElementById('wCount');
+const huRing = document.getElementById('huRing'), aiRing = document.getElementById('aiRing');
+const sqs = [];
+for (let i = 0; i < N * N; i++) {
+  const d = document.createElement('div');
+  d.className = 'sq';
+  d.addEventListener('click', () => humanClick(Math.floor(i / N), i % N));
+  boardEl.appendChild(d);
+  sqs.push(d);
+}
+
+let grid, turn, locked, over, lastMove;
+function newGrid() {
+  const g = Array.from({ length: N }, () => Array(N).fill(0));
+  g[3][3] = WHITE; g[3][4] = BLACK; g[4][3] = BLACK; g[4][4] = WHITE;
+  return g;
+}
+const DIR8 = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]];
+function flipsFor(g, r, c, p) {
+  if (g[r][c] !== EMPTY) return [];
+  const opp = p === BLACK ? WHITE : BLACK;
+  const all = [];
+  for (const [dr, dc] of DIR8) {
+    const line = [];
+    let rr = r + dr, cc = c + dc;
+    while (rr >= 0 && rr < N && cc >= 0 && cc < N && g[rr][cc] === opp) { line.push([rr, cc]); rr += dr; cc += dc; }
+    if (line.length && rr >= 0 && rr < N && cc >= 0 && cc < N && g[rr][cc] === p) all.push(...line);
+  }
+  return all;
+}
+function legalMoves(g, p) {
+  const m = [];
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const f = flipsFor(g, r, c, p);
+    if (f.length) m.push({ r, c, flips: f });
+  }
+  return m;
+}
+function counts(g) {
+  let b = 0, w = 0;
+  for (const row of g) for (const v of row) { if (v === BLACK) b++; else if (v === WHITE) w++; }
+  return { b, w };
+}
+
+// ─── 평가 & 미니맥스 (AI=백 관점) ───────────────────────
+const W_CORNER = 120, W_EDGE = 18, W_MOB = 9, W_PIECE = 1.6;
+const CORNERS = [[0,0],[0,7],[7,0],[7,7]];
+function evalBoard(g) {
+  const { b, w } = counts(g);
+  let s = (w - b) * W_PIECE;
+  s += (legalMoves(g, WHITE).length - legalMoves(g, BLACK).length) * W_MOB;
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const v = g[r][c];
+    if (!v) continue;
+    const sign = v === WHITE ? 1 : -1;
+    if (CORNERS.some(([cr, cc]) => cr === r && cc === c)) s += sign * W_CORNER;
+    else if (r === 0 || r === N - 1 || c === 0 || c === N - 1) s += sign * W_EDGE;
+  }
+  // 코너 인접 X칸(위험 지역) 페널티 — 코너가 이미 내 것이면 보너스로 전환
+  const adj = [[[0,1],[1,0],[1,1]], [[0,6],[1,7],[1,6]], [[6,0],[7,1],[6,1]], [[6,6],[7,6],[6,7]]];
+  for (let k = 0; k < 4; k++) {
+    const [cr, cc] = CORNERS[k];
+    for (const [r, c] of adj[k]) {
+      const v = g[r][c];
+      if (!v) continue;
+      const sign = v === WHITE ? 1 : -1;
+      s += (g[cr][cc] === v) ? sign * 14 : -sign * 24;
+    }
+  }
+  return s;
+}
+function minimax(g, depth, alpha, beta, whiteTurn) {
+  const wm = legalMoves(g, WHITE), bm = legalMoves(g, BLACK);
+  if (!wm.length && !bm.length) { // 종국
+    const { b, w } = counts(g);
+    return w > b ? 999999 : w < b ? -999999 : 0;
+  }
+  if (depth === 0) return evalBoard(g);
+  const moves = whiteTurn ? wm : bm;
+  if (!moves.length) return minimax(g, depth - 1, alpha, beta, !whiteTurn); // 패스
+  if (whiteTurn) {
+    let best = -Infinity;
+    for (const m of moves) {
+      const g2 = g.map(row => row.slice());
+      g2[m.r][m.c] = WHITE;
+      for (const [r, c] of m.flips) g2[r][c] = WHITE;
+      const v = minimax(g2, depth - 1, alpha, beta, false);
+      if (v > best) best = v;
+      if (alpha < v) alpha = v;
+      if (beta <= alpha) break;
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (const m of moves) {
+      const g2 = g.map(row => row.slice());
+      g2[m.r][m.c] = BLACK;
+      for (const [r, c] of m.flips) g2[r][c] = BLACK;
+      const v = minimax(g2, depth - 1, alpha, beta, true);
+      if (v < best) best = v;
+      if (beta > v) beta = v;
+      if (beta <= alpha) break;
+    }
+    return best;
+  }
+}
+function aiChoose(g, depth) {
+  const moves = legalMoves(g, WHITE);
+  if (!moves.length) return null;
+  if (depth <= 0) return moves[Math.floor(Math.random() * moves.length)];
+  let best = moves[0], bv = -Infinity, alpha = -Infinity;
+  // 코넀 우선 탐색 순서로 가지치기 효율 up
+  moves.sort((a, b) => (CORNERS.some(([r,c]) => r===b.r && c===b.c) ? 1 : 0) - (CORNERS.some(([r,c]) => r===a.r && c===a.c) ? 1 : 0));
+  for (const m of moves) {
+    const g2 = g.map(row => row.slice());
+    g2[m.r][m.c] = WHITE;
+    for (const [r, c] of m.flips) g2[r][c] = WHITE;
+    const v = minimax(g2, depth - 1, alpha, Infinity, false);
+    if (v > bv) { bv = v; best = m; }
+    if (alpha < v) alpha = v;
+  }
+  return best;
+}
+
+// ─── CPU 등급 ───────────────────────────────────────────
+const CPUS = {
+  mw: { name: '🍲 전자레인지',  spec: '700 W · 깊이 0 (무작위)', depth: 0 },
+  ph: { name: '📱 피처폰',     spec: '2005 ARM9 · 깊이 1', depth: 1 },
+  tv: { name: '📺 스마트 TV',  spec: '2010 듀얼코어 · 깊이 2', depth: 2 },
+  om: { name: '📱 옴니아',     spec: '2008 624MHz · 깊이 3', depth: 3 },
+  gs: { name: '📱 아이폰 3GS', spec: '2009 Cortex-A8 · 깊이 4', depth: 4 },
+  m4: { name: '🧠 M4 Max',     spec: '2026 풀가속 · 깊이 5',  depth: 5 },
+};
+let currentCpu = 'om';
+
+// ─── 진행 ───────────────────────────────────────────────
+function render() {
+  const hints = (!over && turn === BLACK) ? legalMoves(grid, BLACK) : [];
+  const hintSet = new Set(hints.map(m => m.r * N + m.c));
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const el = sqs[r * N + c];
+    const v = grid[r][c];
+    el.className = 'sq' + (hintSet.has(r * N + c) ? ' hint' : '') +
+      (lastMove && lastMove[0] === r && lastMove[1] === c ? ' last' : '');
+    el.innerHTML = v === BLACK ? '<div class="disc b"></div>' : v === WHITE ? '<div class="disc w"></div>' : '<div class="dot"></div>';
+  }
+  const { b, w } = counts(grid);
+  bCountEl.textContent = b; wCountEl.textContent = w;
+}
+function setRings() {
+  huRing.className = 'turn-ring' + (turn === BLACK && !over ? ' active' : '');
+  aiRing.className = 'turn-ring' + (turn === WHITE && !over ? ' active' : '');
+}
+function setStatus(html) { statusEl.innerHTML = html; }
+
+function endMatch() {
+  over = true; locked = true;
+  const { b, w } = counts(grid);
+  if (b > w) {
+    overlay.textContent = '⚫ ' + b + ' : ' + w + ' — 당신 승리!';
+    overlay.className = 'overlay win';
+    setStatus('<b>당신 승리!</b> ' + b + ' 대 ' + w + ' — ' + CPUS[currentCpu].name + '를 꺾었습니다!');
+  } else if (w > b) {
+    overlay.textContent = '⚪ ' + w + ' : ' + b + ' — AI 승리';
+    overlay.className = 'overlay lose';
+    setStatus('<b>' + CPUS[currentCpu].name + ' 승리</b> — ' + w + ' 대 ' + b + ' · 등급을 낮추고 복수하세요');
+  } else {
+    overlay.textContent = '🤝 ' + b + ' : ' + w + ' — 무승부';
+    overlay.className = 'overlay draw';
+    setStatus('<b>' + b + ' 대 ' + w + ' — 무승부!</b>');
+  }
+  setRings();
+}
+
+function advanceTurn() {
+  if (over) return;
+  const huCan = legalMoves(grid, BLACK).length > 0;
+  const aiCan = legalMoves(grid, WHITE).length > 0;
+  if (!huCan && !aiCan) { endMatch(); return; }
+  if (turn === BLACK && aiCan) { turn = WHITE; setRings(); render(); aiTurn(); return; }
+  if (turn === WHITE && huCan) { turn = BLACK; locked = false; setRings(); render(); setStatus('당신 차례 — 파란 점이 있는 칸을 클릭하세요'); return; }
+  // 둘 중 하나만 둘 수 있으면 자동 패스 처리
+  if (!huCan && aiCan) { setStatus('당신이 둘 곳이 없어 <b>패스</b> — AI 차례'); turn = WHITE; setRings(); render(); setTimeout(aiTurn, 700); return; }
+  if (!aiCan && huCan) { setStatus('AI가 둘 곳이 없어 <b>패스</b> — 당신 차례'); turn = BLACK; locked = false; setRings(); render(); return; }
+}
+
+function aiTurn() {
+  if (over) return;
+  locked = true;
+  setStatus('AI 생각 중… (' + CPUS[currentCpu].name + ', 깊이 ' + CPUS[currentCpu].depth + ')');
+  setTimeout(() => {
+    if (over) return;
+    const m = aiChoose(grid, CPUS[currentCpu].depth);
+    if (!m) { advanceTurn(); return; }
+    grid[m.r][m.c] = WHITE;
+    for (const [r, c] of m.flips) grid[r][c] = WHITE;
+    lastMove = [m.r, m.c];
+    render();
+    advanceTurn();
+  }, 250 + Math.random() * 350);
+}
+
+function humanClick(r, c) {
+  if (locked || over || turn !== BLACK) return;
+  const flips = flipsFor(grid, r, c, BLACK);
+  if (!flips.length) return;
+  grid[r][c] = BLACK;
+  for (const [rr, cc] of flips) grid[rr][cc] = BLACK;
+  lastMove = [r, c];
+  render();
+  advanceTurn();
+}
+
+function newMatch() {
+  grid = newGrid();
+  turn = BLACK; locked = false; over = false; lastMove = null;
+  overlay.className = 'overlay'; overlay.textContent = '';
+  render();
+  setRings();
+  setStatus('새 대국 (AI CPU: <b>' + CPUS[currentCpu].name + '</b>) — 당신 선공(⚫), 파란 점을 클릭하세요');
+}
+
+document.querySelectorAll('.cpu').forEach(b =>
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.cpu').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    currentCpu = b.dataset.cpu;
+    document.getElementById('cpuName').textContent = CPUS[currentCpu].name;
+    document.getElementById('cpuSpec').textContent = CPUS[currentCpu].spec;
+    setStatus('AI CPU 교체: <b>' + CPUS[currentCpu].name + '</b> (' + CPUS[currentCpu].spec + ') — 새 대국부터 적용됩니다');
+  }));
+document.getElementById('newMatch').addEventListener('click', newMatch);
+
+newMatch();
+</script>
+<script>
+// 규칙 모달
+const ruleModal = document.getElementById('ruleModal');
+document.getElementById('ruleBtn').addEventListener('click', () => ruleModal.classList.add('open'));
+document.getElementById('ruleClose').addEventListener('click', () => ruleModal.classList.remove('open'));
+ruleModal.addEventListener('click', e => { if (e.target === ruleModal) ruleModal.classList.remove('open'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') ruleModal.classList.remove('open'); });
+</script>
+</body>
+</html>

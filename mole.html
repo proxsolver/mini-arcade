@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>두더지잡기 AI 대결 — ZCode 데모</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --text:#e8eaf2; --sub:#9aa1b5; --accent:#7c8cf8; --human:#4fd08a; --ai:#e0645c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .app { width:760px; }
+  header { text-align:center; margin-bottom:8px; }
+  header h1 { font-size:28px; }
+  header h1 .ai { color:var(--ai); } header h1 .hu { color:var(--human); }
+  header h1 .vs { font-size:18px; color:var(--sub); margin:0 8px; }
+  .rules { color:var(--sub); font-size:13px; margin-top:6px; }
+  .rules b { color:var(--text); }
+  .scoreboard { display:flex; justify-content:center; gap:60px; align-items:center; margin-top:14px; }
+  .sb { text-align:center; }
+  .sb .name { font-size:14px; font-weight:700; }
+  #aiName { color:var(--ai); } #huName { color:var(--human); }
+  .sb .spec { font-size:11px; color:var(--sub); margin-top:2px; font-family:'Consolas','Courier New',monospace; min-height:14px; }
+  .sb .pts { font-size:38px; font-weight:900; font-variant-numeric:tabular-nums; }
+  .vsline { font-size:20px; color:var(--sub); font-weight:800; }
+  .board-wrap { position:relative; margin-top:16px; display:flex; justify-content:center; }
+  #board { display:grid; grid-template-columns:repeat(3, 120px); gap:12px; background:#155238; padding:14px; border-radius:18px; }
+  .hole { width:120px; height:120px; background:#0f3d2a; border-radius:50%; display:flex; align-items:center;
+    justify-content:center; font-size:58px; cursor:pointer; position:relative; overflow:hidden; }
+  .hole .mole { opacity:0; transform:translateY(60px) scale(.6); transition:transform .12s, opacity .12s; }
+  .hole.up .mole { opacity:1; transform:translateY(0) scale(1); }
+  .hole.bonked .mole { opacity:1; transform:scale(1.25); filter:grayscale(1); }
+  .hole .who { position:absolute; bottom:8px; font-size:11px; font-weight:800; opacity:0; }
+  .hole.bonked.hu .who { opacity:1; color:var(--human); }
+  .hole.bonked.ai .who { opacity:1; color:var(--ai); }
+  .timer { text-align:center; margin-top:12px; font-size:16px; color:var(--sub); font-variant-numeric:tabular-nums; }
+  .timer b { color:var(--text); }
+  .overlay { position:absolute; inset:0; background:rgba(18,20,32,.87); display:none; align-items:center;
+    justify-content:center; border-radius:18px; font-size:24px; font-weight:900; z-index:5; text-align:center; }
+  .overlay.win { display:flex; color:#ffd24d; }
+  .overlay.lose { display:flex; color:#8b93a8; }
+  .overlay.draw { display:flex; color:var(--sub); }
+  .controls { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+  button { border:0; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; }
+  #startBtn { background:var(--human); color:#182a20; }
+  #ruleBtn { background:#3a4060; }
+  .cpu { font-family:'Consolas','Courier New',monospace; background:#2c3145; border:1px solid #454c68;
+    padding:8px 12px; font-size:13px; line-height:1.2; text-align:left; }
+  .cpu small { display:block; font-size:10px; opacity:.65; font-weight:400; }
+  .cpu.active { background:var(--accent); border-color:var(--accent); }
+  .cpu-label { color:var(--sub); font-size:13px; }
+  .status { margin-top:12px; text-align:center; font-size:15px; color:var(--sub); min-height:22px; }
+  .status b { color:var(--text); }
+  .back { margin-top:10px; text-align:center; }
+  .back a { color:var(--sub); font-size:13px; text-decoration:none; border-bottom:1px solid #454c68; }
+  footer { margin-top:8px; color:var(--sub); font-size:11px; text-align:center; }
+  .modal { position:fixed; inset:0; background:rgba(12,14,22,.78); display:none; align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .modal.open { display:flex; }
+  .modal-box { background:var(--panel); border:1px solid #454c68; border-radius:18px; max-width:560px; width:100%;
+    max-height:86vh; overflow-y:auto; padding:24px 26px; font-size:14.5px; line-height:1.65; color:var(--sub); }
+  .modal-box h3 { font-size:19px; color:var(--text); margin-bottom:10px; }
+  .modal-box b { color:var(--accent); }
+  .modal-box .close { float:right; background:#3a4060; border-radius:8px; padding:6px 12px; cursor:pointer; color:var(--text); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="ai">🤖 AI</span><span class="vs">VS</span><span class="hu">🧑 나</span> <span style="font-size:20px;color:var(--sub)">— 두더지잡기</span></h1>
+    <p class="rules"><b>20초</b> 동안 같은 두더지를 잡는 대결 · 더 많이 잡은 쪽이 승리 · 두더지는 약 <b>0.9초</b>만 나옵니다</p>
+  </header>
+
+  <div class="scoreboard">
+    <div class="sb"><div class="name" id="aiName">🤖 AI</div><div class="spec" id="cpuSpec">2008 624MHz · 명중 75%</div><div class="pts" id="aiPts">0</div></div>
+    <div class="vsline">VS</div>
+    <div class="sb"><div class="name" id="huName">🧑 나</div><div class="spec">인간 순발력의 시간</div><div class="pts" id="huPts">0</div></div>
+  </div>
+
+  <div class="board-wrap">
+    <div id="board"></div>
+    <div class="overlay" id="overlay"></div>
+  </div>
+  <div class="timer" id="timer">준비 완료 — 시작 버튼을 누르세요</div>
+
+  <div class="controls">
+    <button id="startBtn">▶ 시작</button>
+    <button id="ruleBtn">📖 규칙</button>
+    <span class="cpu-label">AI CPU:</span>
+    <button class="cpu" data-cpu="mw">🍲 전자레인지<small>명중 25%</small></button>
+    <button class="cpu" data-cpu="ph">📱 피처폰<small>명중 45%</small></button>
+    <button class="cpu" data-cpu="tv">📺 스마트TV<small>명중 62%</small></button>
+    <button class="cpu active" data-cpu="om">📱 옴니아<small>명중 75%</small></button>
+    <button class="cpu" data-cpu="gs">📱 아이폰3GS<small>명중 88%</small></button>
+    <button class="cpu" data-cpu="m4">🧠 M4 Max<small>명중 97%</small></button>
+  </div>
+  <div class="status" id="status">시작 버튼을 누르면 20초 대결이 시작됩니다</div>
+  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <footer>제품별 연산력 = 명중률과 반응속도 · vanilla JS — 생성·실행·검증 ZCode</footer>
+
+  <div class="modal" id="ruleModal">
+    <div class="modal-box">
+      <button class="close" id="ruleClose">닫기 ✕</button>
+      <h3>🔨 두더지잡기 — 규칙</h3>
+      · <b>20초</b> 동안 두더지가 구멍에서 올라옵니다. 나타난 두더지를 클릭해 잡으면 1점 — <b>많이 잡은 쪽이 승리</b>.<br>
+      · 두더지는 약 0.9초 후 숨습니다. 한 번 잡힌 두더지는 이미 처리 완료 — 못 잡으면 다음 두더지를 기다리세요.<br>
+      · AI는 <b>같은 두더지</b>를 자기 반응속도 후 시도해서 명중률만큼 잡아냅니다. 두더지 위 라벨(<b style="color:#4fd08a">나</b>/<b style="color:#e0645c">AI</b>)으로 누가 잡았는지 표시됩니다.<br>
+      · CPU 등급 = <b>명중률 + 반응속도</b> — 전자레인지(25%·900ms) → 피처폰(45%) → 스마트TV(62%) → 옴니아(75%) → 아이폰3GS(88%) → M4 Max(97%·180ms·기계의 영역).<br><br>
+      💡 <b>전략</b>: 중앙 구멍에 손(마우스)을 두고 양옆을 커버하세요. 옴니아까지는 집중하면 이깁니다 — 3GS 이상은 프로 게이머급 손이 필요합니다.
+    </div>
+  </div>
+</div>
+
+<script>
+const CPUS = {
+  mw: { name: '🍲 전자레인지',  spec: '700 W · 명중 25% · 반응 900ms', acc: 0.25, ms: 900 },
+  ph: { name: '📱 피처폰',     spec: '2005 ARM9 · 명중 45% · 반응 700ms', acc: 0.45, ms: 700 },
+  tv: { name: '📺 스마트 TV',  spec: '2010 듀얼코어 · 명중 62% · 반응 540ms', acc: 0.62, ms: 540 },
+  om: { name: '📱 옴니아',     spec: '2008 624MHz · 명중 75% · 반응 480ms', acc: 0.75, ms: 480 },
+  gs: { name: '📱 아이폰 3GS', spec: '2009 Cortex-A8 · 명중 88% · 반응 330ms', acc: 0.88, ms: 330 },
+  m4: { name: '🧠 M4 Max',     spec: '2026 풀가속 · 명중 97% · 반응 180ms', acc: 0.97, ms: 180 },
+};
+let currentCpu = 'om';
+
+const boardEl = document.getElementById('board');
+const overlay = document.getElementById('overlay');
+const timerEl = document.getElementById('timer');
+const statusEl = document.getElementById('status');
+const holes = [];
+for (let i = 0; i < 9; i++) {
+  const d = document.createElement('div');
+  d.className = 'hole';
+  d.innerHTML = '<div class="mole">🐹</div><div class="who"></div>';
+  d.addEventListener('click', () => humanHit(i));
+  boardEl.appendChild(d);
+  holes.push(d);
+}
+
+let huPts = 0, aiPts = 0, running = false, moleUp = -1, moleToken = 0, aiTimer = null;
+
+function setStatus(html) { statusEl.innerHTML = html; }
+function renderPts() {
+  document.getElementById('huPts').textContent = huPts;
+  document.getElementById('aiPts').textContent = aiPts;
+}
+
+function spawn() {
+  if (!running) return;
+  const token = ++moleToken;
+  const idx = Math.floor(Math.random() * 9);
+  moleUp = idx;
+  const h = holes[idx];
+  h.className = 'hole up';
+  h.querySelector('.who').textContent = '';
+  // AI 시도: 자기 반응속도 후 명중 롤
+  clearTimeout(aiTimer);
+  aiTimer = setTimeout(() => {
+    if (!running || token !== moleToken || moleUp !== idx) return;
+    if (Math.random() < CPUS[currentCpu].acc) {
+      aiPts++; renderPts();
+      h.className = 'hole up bonked ai';
+      h.querySelector('.who').textContent = 'AI 잡음';
+      moleUp = -1;
+    }
+    // 명중 실패면 그냥 계속 대기
+  }, CPUS[currentCpu].ms * (0.85 + Math.random() * 0.4));
+  // 두더지 숨기
+  setTimeout(() => {
+    if (token !== moleToken) return;
+    h.className = 'hole';
+    moleUp = -1;
+    if (running) spawn();
+  }, 900);
+}
+
+function humanHit(i) {
+  if (!running || i !== moleUp) return;
+  moleUp = -1;
+  moleToken++; // AI 타이머 무효화
+  huPts++; renderPts();
+  const h = holes[i];
+  h.className = 'hole up bonked hu';
+  h.querySelector('.who').textContent = '나 잡음!';
+  setTimeout(() => { h.className = 'hole'; if (running) spawn(); }, 350);
+}
+
+function endGame() {
+  running = false;
+  clearTimeout(aiTimer);
+  moleToken++;
+  for (const h of holes) h.className = 'hole';
+  timerEl.innerHTML = '종료!';
+  if (huPts > aiPts) {
+    overlay.textContent = '🏆 ' + huPts + ' : ' + aiPts + ' — 당신 승리!';
+    overlay.className = 'overlay win';
+    setStatus('<b>당신 승리!</b> ' + huPts + ' 대 ' + aiPts + ' — 순발력이 ' + CPUS[currentCpu].name + '을 이겼습니다');
+  } else if (aiPts > huPts) {
+    overlay.textContent = '🤖 ' + aiPts + ' : ' + huPts + ' — AI 승리';
+    overlay.className = 'overlay lose';
+    setStatus('<b>' + CPUS[currentCpu].name + ' 승리</b> — ' + aiPts + ' 대 ' + huPts + ' · 등급을 낮추고 복수하세요');
+  } else {
+    overlay.textContent = '🤝 ' + huPts + ' : ' + aiPts + ' — 무승부';
+    overlay.className = 'overlay draw';
+    setStatus('<b>' + huPts + ' 대 ' + aiPts + ' — 무승부!</b> 아슬아슬한 접전이었습니다');
+  }
+  document.getElementById('startBtn').textContent = '▶ 다시 시작';
+}
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  if (running) return;
+  huPts = 0; aiPts = 0; renderPts();
+  overlay.className = 'overlay';
+  running = true;
+  document.getElementById('startBtn').textContent = '게임 중…';
+  setStatus('대결 중! (AI: <b>' + CPUS[currentCpu].name + '</b>)');
+  const t0 = Date.now();
+  const tick = setInterval(() => {
+    const left = 20000 - (Date.now() - t0);
+    if (left <= 0 || !running) { clearInterval(tick); if (running) endGame(); return; }
+    timerEl.innerHTML = '⏱ 남은 시간 <b>' + (left / 1000).toFixed(1) + '</b>초';
+  }, 100);
+  spawn();
+});
+document.querySelectorAll('.cpu').forEach(btn =>
+  btn.addEventListener('click', () => {
+    if (running) { setStatus('대결 중에는 CPU를 바꿀 수 없습니다'); return; }
+    document.querySelectorAll('.cpu').forEach(x => x.classList.remove('active'));
+    btn.classList.add('active');
+    currentCpu = btn.dataset.cpu;
+    document.getElementById('aiName').textContent = '🤖 ' + CPUS[currentCpu].name;
+    document.getElementById('cpuSpec').textContent = CPUS[currentCpu].spec;
+    setStatus('AI 교체: <b>' + CPUS[currentCpu].name + '</b> (' + CPUS[currentCpu].spec + ')');
+  }));
+const ruleModal = document.getElementById('ruleModal');
+document.getElementById('ruleBtn').addEventListener('click', () => ruleModal.classList.add('open'));
+document.getElementById('ruleClose').addEventListener('click', () => ruleModal.classList.remove('open'));
+ruleModal.addEventListener('click', e => { if (e.target === ruleModal) ruleModal.classList.remove('open'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') ruleModal.classList.remove('open'); });
+</script>
+</body>
+</html>

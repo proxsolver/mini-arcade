@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>짝맞추기 메모리 AI 대결 — ZCode 데모</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --text:#e8eaf2; --sub:#9aa1b5; --accent:#7c8cf8;
+    --human:#4fd08a; --ai:#e0645c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .app { width:820px; }
+  header { text-align:center; margin-bottom:8px; }
+  header h1 { font-size:28px; }
+  header h1 .ai { color:var(--ai); }
+  header h1 .hu { color:var(--human); }
+  header h1 .vs { font-size:18px; color:var(--sub); margin:0 8px; }
+  .rules { color:var(--sub); font-size:13px; margin-top:6px; }
+  .rules b { color:var(--text); }
+  .arena { display:flex; gap:16px; justify-content:center; align-items:flex-start; margin-top:14px; }
+  .player-card { width:160px; background:var(--panel); border-radius:14px; padding:14px 12px; text-align:center; }
+  .player-card .tag { font-size:16px; font-weight:800; }
+  #aiCard .tag { color:var(--ai); }
+  #huCard .tag { color:var(--human); }
+  .player-card .spec { font-size:11px; color:var(--sub); margin-top:4px; font-family:'Consolas','Courier New',monospace; min-height:28px; line-height:1.4; }
+  .pairs { font-size:26px; font-weight:800; margin-top:10px; font-variant-numeric:tabular-nums; }
+  .pairs small { display:block; font-size:11px; color:var(--sub); font-weight:400; }
+  .turn-dot { width:34px; height:34px; border-radius:50%; margin:10px auto 0; background:#3a4060; opacity:.35; }
+  #aiCard .turn-dot.active { background:var(--ai); opacity:1; box-shadow:0 0 14px var(--ai); }
+  #huCard .turn-dot.active { background:var(--human); opacity:1; box-shadow:0 0 14px var(--human); }
+  .board-wrap { position:relative; }
+  #board { display:grid; grid-template-columns:repeat(4, 96px); gap:10px; background:var(--panel);
+    padding:12px; border-radius:16px; }
+  .card3d { width:96px; height:96px; perspective:600px; cursor:pointer; }
+  .inner { position:relative; width:100%; height:100%; transform-style:preserve-3d;
+    transition:transform .35s ease; }
+  .card3d.flipped .inner { transform:rotateY(180deg); }
+  .face { position:absolute; inset:0; border-radius:12px; backface-visibility:hidden;
+    display:flex; align-items:center; justify-content:center; }
+  .face.back { background:linear-gradient(135deg, #3a4266, #2c3350); font-size:34px; color:#7c8cf8; }
+  .face.back::after { content:"?"; }
+  .face.front { background:#1f2333; border:2px solid #454c68; font-size:44px;
+    transform:rotateY(180deg); }
+  .card3d.matched { cursor:default; }
+  .card3d.matched .face.front { border-color:#3d8f68; background:#1c2b26; box-shadow:0 0 10px rgba(79,208,138,.25); }
+  .card3d.hu-pick.matched .face.front { border-color:var(--human); box-shadow:0 0 12px rgba(79,208,138,.4); }
+  .card3d.ai-pick.matched .face.front { border-color:var(--ai); box-shadow:0 0 12px rgba(224,100,92,.4); }
+  .overlay { position:absolute; inset:0; background:rgba(18,20,32,.87); display:none; align-items:center;
+    justify-content:center; border-radius:16px; font-size:26px; font-weight:900; z-index:5; text-align:center; line-height:1.5; }
+  .overlay.win { display:flex; color:#ffd24d; }
+  .overlay.lose { display:flex; color:#8b93a8; }
+  .overlay.draw { display:flex; color:var(--sub); }
+  .controls { display:flex; gap:8px; align-items:center; justify-content:center; margin-top:16px; flex-wrap:wrap; }
+  button { border:0; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; cursor:pointer; color:#fff; }
+  #newMatch { background:#3a4060; }
+  #ruleBtn { background:#3a4060; }
+  .cpu { font-family:'Consolas','Courier New',monospace; background:#2c3145; border:1px solid #454c68;
+    padding:8px 12px; font-size:13px; line-height:1.2; text-align:left; }
+  .cpu small { display:block; font-size:10px; opacity:.65; font-weight:400; }
+  .cpu.active { background:var(--accent); border-color:var(--accent); }
+  .cpu-label { color:var(--sub); font-size:13px; }
+  .status { margin-top:12px; text-align:center; font-size:15px; color:var(--sub); min-height:22px; }
+  .status b { color:var(--text); }
+  .back { margin-top:10px; text-align:center; }
+  .back a { color:var(--sub); font-size:13px; text-decoration:none; border-bottom:1px solid #454c68; }
+  footer { margin-top:8px; color:var(--sub); font-size:11px; text-align:center; }
+  .modal { position:fixed; inset:0; background:rgba(12,14,22,.78); display:none;
+    align-items:center; justify-content:center; z-index:50; padding:24px; }
+  .modal.open { display:flex; }
+  .modal-box { background:var(--panel); border:1px solid #454c68; border-radius:18px; max-width:560px;
+    width:100%; max-height:86vh; overflow-y:auto; padding:24px 26px; font-size:14.5px; line-height:1.65; color:var(--sub); }
+  .modal-box h3 { font-size:19px; color:var(--text); margin-bottom:10px; }
+  .modal-box b { color:var(--accent); }
+  .modal-box .close { float:right; background:#3a4060; border-radius:8px; padding:6px 12px; cursor:pointer;
+    color:var(--text); font-size:13px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1><span class="ai">🤖 AI</span><span class="vs">VS</span><span class="hu">🧑 나</span> <span style="font-size:20px;color:var(--sub)">— 짝맞추기 메모리</span></h1>
+    <p class="rules">같은 그림 카드 2장을 <b>번갈아 뒤집어</b> 짝을 맞춥니다 · 짝을 맞추면 <b>한 번 더</b> · <b>더 많은 짝</b>을 가져간 쪽이 승리 · 당신 선공</p>
+  </header>
+
+  <div class="arena">
+    <div class="player-card" id="aiCard">
+      <div class="tag">🤖 <span id="cpuName">📱 옴니아</span></div>
+      <div class="spec" id="cpuSpec">2008 624MHz · 기억력 6장<br><span id="aiMemState">AI가 기억 중: 0장</span></div>
+      <div class="pairs" id="aiPairs">0<small>AI 짝</small></div>
+      <div class="turn-dot" id="aiDot"></div>
+    </div>
+
+    <div class="board-wrap">
+      <div id="board"></div>
+      <div class="overlay" id="overlay"></div>
+    </div>
+
+    <div class="player-card" id="huCard">
+      <div class="tag">🧑 나</div>
+      <div class="spec">생물학적 뉴런 860억 개<br>당신의 기억력이 무기</div>
+      <div class="pairs" id="huPairs">0<small>내 짝</small></div>
+      <div class="turn-dot active" id="huDot"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button id="newMatch">🔄 새 대국</button>
+    <button id="ruleBtn">📖 규칙</button>
+    <span class="cpu-label">AI CPU:</span>
+    <button class="cpu" data-cpu="mw">🍲 전자레인지<small>700W · 기억 0장</small></button>
+    <button class="cpu" data-cpu="ph">📱 피처폰<small>ARM9 · 기억 2장</small></button>
+    <button class="cpu" data-cpu="tv">📺 스마트TV<small>듀얼코어 · 기억 4장</small></button>
+    <button class="cpu active" data-cpu="om">📱 옴니아<small>624MHz · 기억 6장</small></button>
+    <button class="cpu" data-cpu="gs">📱 아이폰3GS<small>Cortex-A8 · 기억 10장</small></button>
+    <button class="cpu" data-cpu="m4">🧠 M4 Max<small>2026 · 기억 16장</small></button>
+  </div>
+  <div class="status" id="status">새 대국 — 카드를 클릭해 짝을 찾으세요 (당신 선공)</div>
+  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <footer>CPU 등급 = AI의 기억력(RAM) · vanilla JS 단일 파일 — 생성·실행·검증 ZCode</footer>
+
+  <div class="modal" id="ruleModal">
+    <div class="modal-box">
+      <button class="close" id="ruleClose">닫기 ✕</button>
+      <h3>💾 짝맞추기 메모리 — 규칙</h3>
+      · 4×4 판에 8쌍의 그림 카드가 뒤집혀 있습니다. 두 장을 골라 뒤집어 <b>같은 그림</b>이면 짝을 가져갑니다.<br>
+      · 짝을 맞춘 쪽은 <b>한 번 더</b> 뒤집을 수 있고, 놓치면 상대 차례로 넘어갑니다.<br>
+      · 8쌍이 모두 나가면 대국 종료 — <b>짝을 더 많이 가져간 쪽이 승리</b>합니다.<br>
+      · <b>당신이 선공</b>이며, 카드를 클릭해 뒤집습니다. AI 차례에는 AI가 스스로 카드를 선택합니다.<br>
+      · CPU 등급 = <b>AI가 기억하는 카드 수</b> — 전자레인지(0장·본 걸 바로 잊음) → 286(2장) → 386(4장) → 486(6장) → Pentium(10장) → M4 Max(16장 전량·사실상 완벽 기억). <b>당신이 뒤집은 카드도 AI는 봅니다!</b> AI 카드 아래 "기억 중" 표시로 현재 기억량을 확인할 수 있어요.<br><br>
+      💡 <b>전략</b>: 상대가 뒤집은 카드의 위치를 <b>직접 외우는 것</b>이 전부입니다. 고급 CPU일수록 당신이 실패한 짝을 그대로 가져가니, 놓친 카드는 반드시 기억하세요. 초반엔 정보 수집, 후반엔 몰아치기!
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── 상태 ───────────────────────────────────────────────
+const EMOJIS = ['🍎','🍌','🍇','🍓','🍒','🥑','🍑','🍍'];
+const boardEl = document.getElementById('board');
+const overlay = document.getElementById('overlay');
+const statusEl = document.getElementById('status');
+const huPairsEl = document.getElementById('huPairs'), aiPairsEl = document.getElementById('aiPairs');
+const huDot = document.getElementById('huDot'), aiDot = document.getElementById('aiDot');
+
+let cards, matched, flipped, turn, locked, over;
+let huPairs, aiPairs;
+const cardEls = [];
+
+for (let i = 0; i < 16; i++) {
+  const c = document.createElement('div');
+  c.className = 'card3d';
+  c.innerHTML = '<div class="inner"><div class="face back"></div><div class="face front"></div></div>';
+  c.addEventListener('click', () => humanFlip(i));
+  boardEl.appendChild(c);
+  cardEls.push(c);
+}
+
+// ─── CPU 등급 = 기억력(장) ───────────────────────────────
+const CPUS = {
+  mw: { name: '🍲 전자레인지',  spec: '700 W · 기억력 0장',  mem: 0 },
+  ph: { name: '📱 피처폰',     spec: '2005 ARM9 · 기억력 2장',  mem: 2 },
+  tv: { name: '📺 스마트 TV',  spec: '2010 듀얼코어 · 기억력 4장', mem: 4 },
+  om: { name: '📱 옴니아',     spec: '2008 624MHz · 기억력 6장', mem: 6 },
+  gs: { name: '📱 아이폰 3GS', spec: '2009 Cortex-A8 · 기억력 10장', mem: 10 },
+  m4: { name: '🧠 M4 Max',     spec: '2026 풀가속 · 기억력 16장',  mem: 99 },
+};
+let currentCpu = 'om';
+let aiMemory = []; // [{idx, val}] 최근에 본 순서
+
+function aiSee(idx) {
+  if (matched[idx]) return;
+  aiMemory = aiMemory.filter(m => m.idx !== idx);
+  const cap = CPUS[currentCpu].mem;
+  if (cap <= 0) { updateMemState(); return; } // 전자레인지: 저장 자체를 안 함
+  aiMemory.push({ idx, val: cards[idx] });
+  while (aiMemory.length > cap) aiMemory.shift();
+  updateMemState();
+}
+function aiForget(idx) { aiMemory = aiMemory.filter(m => m.idx !== idx); updateMemState(); }
+function updateMemState() {
+  const el = document.getElementById('aiMemState');
+  if (el) el.textContent = 'AI가 기억 중: ' + aiMemory.length + '장';
+}
+
+// ─── 유틸 ───────────────────────────────────────────────
+const sleep = ms => new Promise(res => setTimeout(res, ms));
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function setStatus(html) { statusEl.innerHTML = html; }
+function setDots() {
+  huDot.className = 'turn-dot' + (turn === 'hu' && !over ? ' active' : '');
+  aiDot.className = 'turn-dot' + (turn === 'ai' && !over ? ' active' : '');
+}
+function renderScores() {
+  huPairsEl.innerHTML = huPairs + '<small>내 짝</small>';
+  aiPairsEl.innerHTML = aiPairs + '<small>AI 짝</small>';
+}
+function allMatched() { return matched.every(Boolean); }
+function endMatch() {
+  over = true; locked = true;
+  setDots();
+  if (huPairs > aiPairs) {
+    overlay.textContent = '🏆 ' + huPairs + ' : ' + aiPairs + ' — 당신 승리!';
+    overlay.className = 'overlay win';
+    setStatus('<b>당신 승리!</b> ' + huPairs + ' 대 ' + aiPairs + ' — 인간의 해마가 ' + CPUS[currentCpu].name + '을 이겼습니다!');
+  } else if (aiPairs > huPairs) {
+    overlay.textContent = '🤖 ' + aiPairs + ' : ' + huPairs + ' — AI 승리';
+    overlay.className = 'overlay lose';
+    setStatus('<b>' + CPUS[currentCpu].name + ' 승리</b> — ' + aiPairs + ' 대 ' + huPairs + ' · 등급을 낮추고 복수하세요');
+  } else {
+    overlay.textContent = '🤝 ' + huPairs + ' : ' + aiPairs + ' — 무승부';
+    overlay.className = 'overlay draw';
+    setStatus('<b>' + huPairs + ' 대 ' + aiPairs + ' — 무승부!</b> 기억력이 비슷하네요');
+  }
+}
+
+function showCard(i, who) {
+  cardEls[i].classList.add('flipped');
+  cardEls[i].classList.add(who === 'ai' ? 'ai-pick' : 'hu-pick');
+}
+function hideCard(i) { cardEls[i].classList.remove('flipped'); }
+function markMatched(i) {
+  matched[i] = true;
+  cardEls[i].classList.add('matched');
+  aiForget(i);
+}
+
+// ─── 사람 차례 ──────────────────────────────────────────
+function humanFlip(i) {
+  if (locked || over || turn !== 'hu' || matched[i] || flipped.includes(i)) return;
+  showCard(i, 'hu');
+  aiSee(i); // AI도 내가 뒤집은 카드를 본다!
+  flipped.push(i);
+  if (flipped.length < 2) { setStatus('한 장 더 골라 짝을 맞춰보세요'); return; }
+
+  locked = true;
+  const [a, b] = flipped;
+  setTimeout(() => {
+    if (cards[a] === cards[b]) {
+      markMatched(a); markMatched(b);
+      huPairs++; renderScores();
+      flipped = [];
+      if (allMatched()) { endMatch(); return; }
+      locked = false;
+      setStatus('🎉 <b>짝 발견!</b> 한 번 더 뒤집을 수 있어요');
+    } else {
+      setTimeout(() => {
+        hideCard(a); hideCard(b);
+        cardEls[a].classList.remove('hu-pick'); cardEls[b].classList.remove('hu-pick');
+        flipped = [];
+        turn = 'ai'; setDots();
+        setStatus('아쉽네요 — AI 차례');
+        setTimeout(aiTurn, 600);
+      }, 650);
+    }
+  }, 450);
+}
+
+// ─── AI 차례 ────────────────────────────────────────────
+async function aiTurn() {
+  if (over) return;
+  locked = true;
+  const cpu = CPUS[currentCpu];
+  setStatus('AI 생각 중… (' + cpu.name + ' · 기억 ' + cpu.mem + '장)');
+  await sleep(500 + Math.random() * 400);
+
+  while (!over && turn === 'ai') {
+    // 1) 첫 카드 선택: 기억 속 짝이 있으면 그것부터
+    let first = null, planned = null;
+    const byVal = {};
+    for (const m of aiMemory) (byVal[m.val] = byVal[m.val] || []).push(m.idx);
+    for (const v in byVal) if (byVal[v].length >= 2) { first = byVal[v][0]; planned = byVal[v][1]; break; }
+    const unknown = [];
+    for (let i = 0; i < 16; i++) if (!matched[i] && !aiMemory.some(m => m.idx === i)) unknown.push(i);
+    if (first === null) first = unknown.length ? unknown[Math.floor(Math.random() * unknown.length)]
+      : aiMemory[0].idx; // 기억뿐인 상황(발생하면 안 되지만 안전장치)
+
+    showCard(first, 'ai');
+    aiSee(first);
+    const fromMemory = planned !== null;
+    if (fromMemory) setStatus('AI: <b>기억하고 있었다!</b> 🤖');
+    await sleep(750);
+
+    // 2) 두 번째 카드: 공개된 첫 카드와 같은 그림을 기억 중이면 그것, 아니면 미지의 카드
+    let second = planned;
+    const twin = aiMemory.find(m => m.idx !== first && m.val === cards[first]);
+    if (second === null && twin) second = twin.idx;
+    if (second === null || second === first) {
+      const rest = [];
+      for (let i = 0; i < 16; i++) if (!matched[i] && i !== first && !cardEls[i].classList.contains('flipped')) rest.push(i);
+      second = rest[Math.floor(Math.random() * rest.length)];
+    }
+
+    showCard(second, 'ai');
+    aiSee(second);
+    await sleep(850);
+
+    if (cards[first] === cards[second]) {
+      markMatched(first); markMatched(second);
+      aiPairs++; renderScores();
+      if (allMatched()) { endMatch(); return; }
+      setStatus(fromMemory
+        ? 'AI가 <b>기억으로</b> 짝을 가져갔습니다 — 계속 진행!'
+        : 'AI가 짝을 맞췄습니다 — 계속 진행!');
+      await sleep(800);
+      // 같은 턴 계속
+    } else {
+      await sleep(500);
+      hideCard(first); hideCard(second);
+      cardEls[first].classList.remove('ai-pick'); cardEls[second].classList.remove('ai-pick');
+      turn = 'hu'; setDots();
+      locked = false;
+      setStatus('AI가 놓쳤습니다 — 당신 차례! 방금 카드 두 장을 <b>외워두세요</b>');
+      return;
+    }
+  }
+}
+
+// ─── 대국 관리 ──────────────────────────────────────────
+function newMatch() {
+  const deck = shuffle([...EMOJIS, ...EMOJIS]);
+  cards = deck;
+  matched = Array(16).fill(false);
+  flipped = [];
+  turn = 'hu'; locked = false; over = false;
+  huPairs = 0; aiPairs = 0;
+  aiMemory = [];
+  overlay.className = 'overlay'; overlay.textContent = '';
+  for (let i = 0; i < 16; i++) {
+    cardEls[i].className = 'card3d';
+    cardEls[i].querySelector('.front').textContent = cards[i];
+  }
+  renderScores(); setDots(); updateMemState();
+  setStatus('새 대국 (AI CPU: <b>' + CPUS[currentCpu].name + '</b> · 기억 ' + CPUS[currentCpu].mem + '장) — 당신 선공, 카드를 클릭하세요');
+}
+
+document.querySelectorAll('.cpu').forEach(b =>
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.cpu').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    currentCpu = b.dataset.cpu;
+    document.getElementById('cpuName').textContent = CPUS[currentCpu].name;
+    document.getElementById('cpuSpec').innerHTML = CPUS[currentCpu].spec + '<br><span id="aiMemState">AI가 기억 중: 0장</span>';
+    aiMemory = [];
+    updateMemState();
+    setStatus('AI CPU 교체: <b>' + CPUS[currentCpu].name + '</b> (' + CPUS[currentCpu].spec + ') — 새 대국부터 적용');
+  }));
+document.getElementById('newMatch').addEventListener('click', newMatch);
+
+// 규칙 모달
+const ruleModal = document.getElementById('ruleModal');
+document.getElementById('ruleBtn').addEventListener('click', () => ruleModal.classList.add('open'));
+document.getElementById('ruleClose').addEventListener('click', () => ruleModal.classList.remove('open'));
+ruleModal.addEventListener('click', e => { if (e.target === ruleModal) ruleModal.classList.remove('open'); });
+window.addEventListener('keydown', e => { if (e.key === 'Escape') ruleModal.classList.remove('open'); });
+
+newMatch();
+</script>
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2048 — ZCode 실황 데모</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --cellbg:#1f2333; --text:#e8eaf2; --sub:#9aa1b5; --accent:#7c8cf8; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 20% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .app { width:480px; }
+  header h1 { font-size:38px; letter-spacing:1px; }
+  header h1 span { color:var(--accent); }
+  header p { color:var(--sub); margin-top:6px; font-size:14px; }
+  .scores { display:flex; gap:10px; margin:16px 0; }
+  .score-box { background:var(--panel); border-radius:12px; padding:10px 16px; flex:1; }
+  .score-box .label { font-size:12px; color:var(--sub); }
+  .score-box .value { font-size:24px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .controls { display:flex; gap:10px; margin-bottom:14px; }
+  button { border:0; border-radius:12px; padding:12px 18px; font-size:15px; font-weight:600; cursor:pointer; color:#fff; }
+  #newGame { background:#3a4060; }
+  #aiBtn { background:var(--accent); }
+  #aiBtn.on { background:#e0645c; }
+  .status { font-size:14px; color:var(--sub); margin-bottom:12px; min-height:20px; }
+  .status b { color:var(--text); }
+  #grid { background:var(--panel); border-radius:16px; padding:10px; display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .cell { aspect-ratio:1; background:var(--cellbg); border-radius:10px; display:flex; align-items:center; justify-content:center;
+    font-size:34px; font-weight:800; color:#fff; }
+  .tile-2 { background:#5c6480; }
+  .tile-4 { background:#7a82a8; }
+  .tile-8 { background:#7c8cf8; }
+  .tile-16 { background:#6a7cf0; }
+  .tile-32 { background:#5d6ce8; }
+  .tile-64 { background:#7c5cf8; }
+  .tile-128 { background:#9a5cf8; font-size:28px; }
+  .tile-256 { background:#b85cf8; font-size:28px; }
+  .tile-512 { background:#d85cf0; font-size:28px; }
+  .tile-1024 { background:#f85cb8; font-size:24px; }
+  .tile-2048 { background:#f8b05c; color:#222; font-size:24px; }
+  .tile-super { background:#ffd24d; color:#222; font-size:22px; }
+  .arrows { display:flex; gap:8px; justify-content:center; margin-top:14px; }
+  .arrows button { background:#3a4060; padding:10px 18px; }
+  footer { margin-top:14px; color:var(--sub); font-size:12px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>2048 <span>· AI 데모</span></h1>
+    <p>ZCode가 만들고, ZCode가 직접 플레이합니다</p>
+  </header>
+  <div class="scores">
+    <div class="score-box"><div class="label">점수</div><div class="value" id="score">0</div></div>
+    <div class="score-box"><div class="label">최고 기록</div><div class="value" id="best">0</div></div>
+    <div class="score-box"><div class="label">최대 타일</div><div class="value" id="maxTile">0</div></div>
+  </div>
+  <div class="controls">
+    <button id="newGame">새 게임</button>
+    <button id="aiBtn">AI 자동플레이 ▶</button>
+  </div>
+  <div class="status" id="status">준비됨 — 방향키 또는 AI 버튼으로 시작하세요</div>
+  <div id="grid"></div>
+  <div class="arrows">
+    <button data-dir="left" aria-label="왼쪽">←</button>
+    <button data-dir="up" aria-label="위">↑</button>
+    <button data-dir="down" aria-label="아래">↓</button>
+    <button data-dir="right" aria-label="오른쪽">→</button>
+  </div>
+  <footer>vanilla JS 단일 파일 · 생성 → 서버 실행 → 브라우저 플레이 → 검증 전 과정 ZCode 자동 수행</footer>
+</div>
+
+<script>
+const SIZE = 4;
+const gridEl = document.getElementById('grid');
+const statusEl = document.getElementById('status');
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const maxTileEl = document.getElementById('maxTile');
+const aiBtn = document.getElementById('aiBtn');
+const newGameBtn = document.getElementById('newGame');
+
+const cells = [];
+for (let i = 0; i < SIZE * SIZE; i++) {
+  const d = document.createElement('div');
+  d.className = 'cell';
+  gridEl.appendChild(d);
+  cells.push(d);
+}
+
+let grid, score, over, won, aiTimer = null, aiMoves = 0;
+let best = 0;
+try { best = +(localStorage.getItem('zcode2048best') || 0); } catch (e) {}
+
+function emptyGrid() { return Array.from({ length: SIZE }, () => Array(SIZE).fill(0)); }
+
+function spawn(g) {
+  const empties = [];
+  for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) if (!g[r][c]) empties.push([r, c]);
+  if (!empties.length) return;
+  const [r, c] = empties[Math.floor(Math.random() * empties.length)];
+  g[r][c] = Math.random() < 0.9 ? 2 : 4;
+}
+
+function slideRow(row) {
+  const arr = row.filter(v => v);
+  let gained = 0;
+  for (let i = 0; i < arr.length - 1; i++) {
+    if (arr[i] === arr[i + 1]) { arr[i] *= 2; gained += arr[i]; arr.splice(i + 1, 1); }
+  }
+  while (arr.length < SIZE) arr.push(0);
+  return { arr, gained };
+}
+
+function move(g, dir) {
+  let gained = 0, moved = false;
+  const ng = emptyGrid();
+  if (dir === 'left' || dir === 'right') {
+    for (let r = 0; r < SIZE; r++) {
+      let row = g[r].slice();
+      if (dir === 'right') row.reverse();
+      const res = slideRow(row);
+      let out = res.arr;
+      if (dir === 'right') out = out.slice().reverse();
+      ng[r] = out;
+      gained += res.gained;
+      if (out.join(',') !== g[r].join(',')) moved = true;
+    }
+  } else {
+    for (let c = 0; c < SIZE; c++) {
+      let col = [];
+      for (let r = 0; r < SIZE; r++) col.push(g[r][c]);
+      if (dir === 'down') col.reverse();
+      const res = slideRow(col);
+      let out = res.arr;
+      if (dir === 'down') out = out.slice().reverse();
+      for (let r = 0; r < SIZE; r++) ng[r][c] = out[r];
+      gained += res.gained;
+      if (out.join(',') !== col.join(',')) moved = true;
+    }
+  }
+  return { g: ng, gained, moved };
+}
+
+function canMove(g) {
+  for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+    if (!g[r][c]) return true;
+    if (c < SIZE - 1 && g[r][c] === g[r][c + 1]) return true;
+    if (r < SIZE - 1 && g[r][c] === g[r + 1][c]) return true;
+  }
+  return false;
+}
+
+function maxTile(g) { return Math.max(...g.flat()); }
+
+function render() {
+  const mx = maxTile(grid);
+  for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) {
+    const v = grid[r][c];
+    const el = cells[r * SIZE + c];
+    el.textContent = v || '';
+    el.className = 'cell' + (v ? (v > 2048 ? ' tile-super' : ' tile-' + v) : '');
+  }
+  scoreEl.textContent = score;
+  maxTileEl.textContent = mx;
+  if (score > best) { best = score; try { localStorage.setItem('zcode2048best', best); } catch (e) {} }
+  bestEl.textContent = best;
+}
+
+function setStatus(html) { statusEl.innerHTML = html; }
+
+function newGame() {
+  stopAI(true);
+  grid = emptyGrid(); score = 0; over = false; won = false; aiMoves = 0;
+  spawn(grid); spawn(grid);
+  render();
+  setStatus('새 게임 시작 — 방향키 또는 <b>AI 자동플레이</b> 버튼을 누르세요');
+}
+
+function playerMove(dir) {
+  if (over || !grid) return;
+  const res = move(grid, dir);
+  if (!res.moved) return;
+  grid = res.g;
+  score += res.gained;
+  spawn(grid);
+  render();
+  if (maxTile(grid) >= 2048 && !won) { won = true; setStatus('🏆 <b>2048 달성!</b> 축하합니다'); stopAI(); return; }
+  if (!canMove(grid)) {
+    over = true;
+    setStatus('💀 게임 오버 — 최종 점수 <b>' + score + '</b>');
+    stopAI();
+  }
+}
+
+// 간단한 탐욕(Greedy) AI: 병합 점수 + 빈 칸 수 + 최대 타일 코너 배치를 평가
+function aiPick() {
+  const dirs = ['up', 'left', 'right', 'down'];
+  let bestDir = null, bestVal = -Infinity;
+  for (const dir of dirs) {
+    const res = move(grid, dir);
+    if (!res.moved) continue;
+    const g = res.g;
+    const empties = g.flat().filter(v => !v).length;
+    const mx = maxTile(g);
+    const corner = (g[0][0] === mx || g[0][SIZE-1] === mx || g[SIZE-1][0] === mx || g[SIZE-1][SIZE-1] === mx) ? 300 : 0;
+    const val = res.gained * 10 + empties * 25 + mx * 0.5 + corner;
+    if (val > bestVal) { bestVal = val; bestDir = dir; }
+  }
+  return bestDir;
+}
+
+function aiStep() {
+  const dir = aiPick();
+  if (!dir) { over = true; setStatus('💀 게임 오버 — AI ' + aiMoves + '수, 최종 점수 <b>' + score + '</b>'); stopAI(); return; }
+  const res = move(grid, dir);
+  grid = res.g;
+  score += res.gained;
+  spawn(grid);
+  aiMoves++;
+  render();
+  if (maxTile(grid) >= 2048) { setStatus('🏆 <b>2048 달성!</b> AI ' + aiMoves + '수 만에 클리어'); stopAI(); return; }
+  if (aiMoves % 20 === 0) setStatus('AI 플레이 중… <b>' + aiMoves + '수</b> · 점수 <b>' + score + '</b> · 최대 타일 <b>' + maxTile(grid) + '</b>');
+  if (aiMoves >= 800) { setStatus('AI 종료(최대 수 도달) — ' + aiMoves + '수 · 최대 타일 <b>' + maxTile(grid) + '</b>'); stopAI(); }
+}
+
+function startAI() {
+  if (over) newGame();
+  aiBtn.classList.add('on');
+  aiBtn.textContent = 'AI 자동플레이 ■ 정지';
+  aiTimer = setInterval(aiStep, 60);
+  setStatus('AI 플레이 시작!');
+}
+
+function stopAI(silent) {
+  if (aiTimer) { clearInterval(aiTimer); aiTimer = null; }
+  aiBtn.classList.remove('on');
+  aiBtn.textContent = 'AI 자동플레이 ▶';
+  if (!silent && aiMoves > 0 && !over) setStatus('AI 정지 — ' + aiMoves + '수 · 최대 타일 <b>' + maxTile(grid) + '</b>');
+}
+
+aiBtn.addEventListener('click', () => { aiTimer ? stopAI() : startAI(); });
+newGameBtn.addEventListener('click', newGame);
+document.querySelectorAll('.arrows button').forEach(b =>
+  b.addEventListener('click', () => playerMove(b.dataset.dir)));
+window.addEventListener('keydown', e => {
+  const map = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
+  if (map[e.key]) { e.preventDefault(); playerMove(map[e.key]); }
+});
+
+newGame();
+</script>
+</body>
+</html>
