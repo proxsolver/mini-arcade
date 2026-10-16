@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>2048 — ZCode 실황 데모</title>
 <style>
-@font-face{font-family:'DungGeunMo';src:url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.3.0/DungGeunMo.woff') format('woff');font-display:swap;}
-  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:90;background:repeating-linear-gradient(0deg,rgba(0,0,0,.25) 0 1px,transparent 1px 3px);}
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap');
+h1,h2,h3,.cpu,.tab,.sw,th{font-family:'Orbitron','Pretendard','Apple SD Gothic Neo',sans-serif;letter-spacing:.5px;}
+.intro{max-width:720px;margin:12px auto 0;background:rgba(18,18,46,.65);border:2px solid #2a2a5a;border-left:6px solid var(--accent,#ff2e88);padding:10px 14px;font-size:13px;color:#8e8ec9;line-height:1.7;}
+.intro .it{font-size:14px;color:#f4f4ff;margin-bottom:4px;font-weight:700;}
+.intro .tier{color:#ffb000;margin-top:2px;}
 
   :root { --bg:#070714; --panel:#12122e; --cellbg:#1a1a42; --text:#f4f4ff; --sub:#8e8ec9; --accent:#ff2e88; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'DungGeunMo','Apple SD Gothic Neo',monospace;
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
     background:radial-gradient(1200px 800px at 20% -10%, #2b3050 0%, var(--bg) 55%);
     color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
   .app { width:480px; }
@@ -54,6 +57,11 @@
     <h1>2048 <span>· AI 데모</span></h1>
     <p>ZCode가 만들고, ZCode가 직접 플레이합니다</p>
   </header>
+
+  <section class="intro">
+    <div class="it">🔢 2048 솔로</div>
+    <p>혼자 즐기는 클래식 2048. AI 자동플레이 버튼으로 기계의 플레이도 관전할 수 있습니다.</p>
+  </section>
   <div class="scores">
     <div class="score-box"><div class="label">점수</div><div class="value" id="score">0</div></div>
     <div class="score-box"><div class="label">최고 기록</div><div class="value" id="best">0</div></div>

@@ -5,11 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MINI ARCADE — 오락실 미니게임</title>
 <style>
-  @font-face {
-    font-family: 'DungGeunMo';
-    src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.3.0/DungGeunMo.woff') format('woff');
-    font-display: swap;
-  }
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&display=swap');
   :root {
     --void: #070714;      /* CRT 꺼진 화면 */
     --cab: #12122e;       /* 오락기 캐비닛 */
@@ -25,7 +21,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { background: var(--void); }
   body {
-    font-family: 'DungGeunMo', 'Apple SD Gothic Neo', monospace;
+    font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif;
     color: var(--paper);
     min-height: 100vh;
     background:
@@ -33,10 +29,8 @@
       repeating-linear-gradient(90deg, transparent 0 46px, rgba(30,30,80,.16) 46px 48px);
     display: flex; align-items: center; justify-content: center; padding: 24px;
   }
-  /* CRT 스캔라인 — 화면 전체를 브라운관처럼 */
-  body::after {
-    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 90;
-    background: repeating-linear-gradient(0deg, rgba(0,0,0,.25) 0 1px, transparent 1px 3px);
+  .hud, .marquee h1, .insert, .marq, .start, .sw, .dip .cap b {
+    font-family: 'Orbitron', 'Pretendard', 'Apple SD Gothic Neo', sans-serif;
   }
   .app { width: 1180px; }
 
