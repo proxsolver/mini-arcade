@@ -99,7 +99,7 @@
     <button class="cpu" data-cpu="m4">🧠 M4 Max<small>최적수 100%</small></button>
   </div>
   <div class="status" id="status">당신 차례 — 빈 칸을 클릭하세요 (X)</div>
-  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <div class="back"><a href="index.html">← 게임 로비로</a> · <a href="leaderboard.html">🏆 리더보드</a></div>
   <footer>제품별 연산력 = 완벽한 수를 둘 확률 · vanilla JS — 생성·실행·검증 ZCode</footer>
 
   <div class="modal" id="ruleModal">
@@ -114,6 +114,7 @@
   </div>
 </div>
 
+<script src="lb-client.js"></script>
 <script>
 const HU = 'X', AI = 'O';
 const boardEl = document.getElementById('board');
@@ -174,6 +175,10 @@ function render() {
 }
 function endMatch(w, line) {
   over = true; locked = true;
+  try {
+    const myMoves = b.filter(x => x === HU).length;
+    LB.submit('tictactoe', w === HU ? 'win' : w === AI ? 'lose' : 'draw', w === HU ? myMoves : 99, CPUS[currentCpu].name);
+  } catch (e) {}
   if (line) for (const i of line) cells[i].classList.add('winline');
   if (!w) {
     overlay.textContent = '🤝 무승부';

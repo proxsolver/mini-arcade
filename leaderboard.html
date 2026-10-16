@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏆 리더보드 — Mini Arcade</title>
+<style>
+  :root { --bg:#1b1e2b; --panel:#262a3d; --text:#e8eaf2; --sub:#9aa1b5; --accent:#7c8cf8;
+    --human:#4fd08a; --ai:#e0645c; --gold:#ffd24d; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Pretendard','Apple SD Gothic Neo','Malgun Gothic',system-ui,sans-serif;
+    background:radial-gradient(1200px 800px at 50% -10%, #2b3050 0%, var(--bg) 55%);
+    color:var(--text); min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .app { width:860px; }
+  header { text-align:center; margin-bottom:12px; }
+  header h1 { font-size:30px; }
+  .namebar { display:flex; gap:10px; justify-content:center; align-items:center; margin-top:12px; }
+  .namebar .lbl { color:var(--sub); font-size:14px; }
+  input[type=text] { width:180px; background:#1f2333; border:2px solid #454c68; border-radius:10px;
+    color:var(--text); font-size:15px; padding:8px 12px; text-align:center; }
+  input[type=text]:focus { outline:none; border-color:var(--accent); }
+  .namebar button { border:0; border-radius:10px; padding:9px 16px; font-size:14px; font-weight:700;
+    cursor:pointer; color:#fff; background:#3a4060; }
+  .stats { display:flex; gap:12px; justify-content:center; margin-top:14px; }
+  .stat { background:var(--panel); border-radius:12px; padding:10px 22px; text-align:center; min-width:120px; }
+  .stat .v { font-size:24px; font-weight:900; color:var(--accent); font-variant-numeric:tabular-nums; }
+  .stat .k { font-size:11px; color:var(--sub); margin-top:2px; }
+  .tabs { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-top:18px; }
+  .tab { border:1px solid #454c68; background:#2c3145; color:var(--sub); border-radius:10px;
+    padding:8px 13px; font-size:13.5px; font-weight:700; cursor:pointer; }
+  .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .board { background:var(--panel); border-radius:16px; padding:16px; margin-top:14px; min-height:220px; }
+  .board h2 { font-size:16px; margin-bottom:10px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; }
+  th { color:var(--sub); font-weight:600; text-align:left; padding:8px 10px; border-bottom:1px solid #363b52; font-size:12px; }
+  td { padding:8px 10px; border-bottom:1px solid #2c3145; }
+  tr.me td { color:var(--gold); font-weight:700; }
+  .rank { font-weight:900; width:40px; }
+  .r1 .rank { color:#ffd24d; } .r2 .rank { color:#c9d2e8; } .r3 .rank { color:#d7926a; }
+  .res { font-weight:800; font-size:12px; border-radius:6px; padding:3px 8px; }
+  .res.win { color:#4fd08a; background:rgba(79,208,138,.12); }
+  .res.lose { color:#e0645c; background:rgba(224,100,92,.12); }
+  .res.draw { color:var(--sub); background:#2c3145; }
+  .empty { text-align:center; color:var(--sub); padding:40px 0; font-size:14px; line-height:1.7; }
+  .offline { text-align:center; color:#e0645c; padding:30px 0; font-size:14px; line-height:1.7; }
+  .recent { margin-top:14px; }
+  .back { margin-top:16px; text-align:center; }
+  .back a { color:var(--sub); font-size:13px; text-decoration:none; border-bottom:1px solid #454c68; margin:0 8px; }
+  footer { margin-top:10px; color:var(--sub); font-size:11px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>🏆 리더보드 <span style="font-size:16px;color:var(--sub)">— SQLite 실시간 기록</span></h1>
+    <div class="namebar">
+      <span class="lbl">내 이름:</span>
+      <input type="text" id="nameInput" maxlength="24" placeholder="익명">
+      <button id="nameBtn">저장</button>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="v" id="stTotal">0</div><div class="k">총 대국</div></div>
+    <div class="stat"><div class="v" id="stWins">0</div><div class="k">인간 승리</div></div>
+    <div class="stat"><div class="v" id="stPlayers">0</div><div class="k">플레이어</div></div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="board">
+    <h2 id="boardTitle">—</h2>
+    <div id="boardBody"><div class="empty">불러오는 중…</div></div>
+  </div>
+
+  <div class="board recent">
+    <h2>🕒 최근 대국 (전체 게임)</h2>
+    <div id="recentBody"><div class="empty">불러오는 중…</div></div>
+  </div>
+
+  <div class="back">
+    <a href="index.html">← 게임 로비로</a>
+  </div>
+  <footer>POST /api/score · GET /api/leaderboard · SQLite (server.py) — GitHub Pages 등 정적 호스팅에선 로컬 서버 없이는 기록이 보이지 않습니다</footer>
+</div>
+
+<script src="lb-client.js"></script>
+<script>
+const tabsEl = document.getElementById('tabs');
+const boardTitle = document.getElementById('boardTitle');
+const boardBody = document.getElementById('boardBody');
+const recentBody = document.getElementById('recentBody');
+const nameInput = document.getElementById('nameInput');
+const myName = () => (localStorage.getItem('arcade_player') || '익명');
+nameInput.value = myName() === '익명' ? '' : myName();
+document.getElementById('nameBtn').addEventListener('click', () => {
+  const v = nameInput.value.trim();
+  localStorage.setItem('arcade_player', v || '익명');
+  load();
+});
+
+let current = 'battle';
+const keys = Object.keys(LB.meta);
+for (const k of keys) {
+  const b = document.createElement('button');
+  b.className = 'tab' + (k === current ? ' active' : '');
+  b.textContent = LB.meta[k].label;
+  b.addEventListener('click', () => {
+    current = k;
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    load();
+  });
+  tabsEl.appendChild(b);
+}
+
+async function api(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('api ' + res.status);
+  return res.json();
+}
+function resBadge(r) {
+  return '<span class="res ' + r + '">' + (r === 'win' ? '승' : r === 'lose' ? '패' : '무') + '</span>';
+}
+
+async function load() {
+  // 통계
+  try {
+    const s = await api('/api/stats');
+    document.getElementById('stTotal').textContent = s.total;
+    document.getElementById('stWins').textContent = s.wins;
+    document.getElementById('stPlayers').textContent = s.players;
+  } catch (e) { /* 무시 */ }
+
+  // 게임별 랭킹 (승리만, 게임별 정렬 방향 적용)
+  const m = LB.meta[current];
+  boardTitle.textContent = m.label + ' — ' + m.metric + ' ' + (m.better === 'low' ? '낮을수록 좋음' : '높을수록 좋음');
+  try {
+    const rows = await api('/api/leaderboard?game=' + current);
+    const wins = rows.filter(r => r.result === 'win');
+    const sorted = wins.sort((a, b) => m.better === 'low' ? a.score - b.score : b.score - a.score);
+    const top = sorted.slice(0, 10);
+    if (!top.length) {
+      boardBody.innerHTML = '<div class="empty">아직 승리 기록이 없습니다<br>이 게임에서 이겨보세요! 🎮</div>';
+    } else {
+      let html = '<table><tr><th>#</th><th>플레이어</th><th>' + m.metric + '</th><th>상대 CPU</th><th>일시</th></tr>';
+      top.forEach((r, i) => {
+        html += '<tr class="' + (i < 3 ? 'r' + (i + 1) + ' ' : '') + (r.player === myName() ? 'me' : '') + '">'
+          + '<td class="rank">' + (i + 1) + '</td><td>' + r.player + '</td><td><b>' + r.score + '</b></td>'
+          + '<td>' + r.cpu + '</td><td style="color:var(--sub);font-size:12px">' + r.created_at + '</td></tr>';
+      });
+      boardBody.innerHTML = html + '</table>';
+    }
+  } catch (e) {
+    boardBody.innerHTML = '<div class="offline">DB 서버에 연결할 수 없습니다 😢<br>로컬에서 <b>python3 server.py</b>를 실행한 뒤 http://127.0.0.1:8137 로 접속하세요</div>';
+  }
+
+  // 최근 대국
+  try {
+    const rows = await api('/api/leaderboard');
+    const recent = rows.slice(0, 10);
+    if (!recent.length) {
+      recentBody.innerHTML = '<div class="empty">기록이 없습니다 — 게임을 플레이하면 여기에 쌓입니다</div>';
+    } else {
+      let html = '<table><tr><th>게임</th><th>플레이어</th><th>결과</th><th>기록</th><th>상대 CPU</th><th>일시</th></tr>';
+      for (const r of recent) {
+        html += '<tr><td>' + (LB.meta[r.game] ? LB.meta[r.game].label : r.game) + '</td>'
+          + '<td class="' + (r.player === myName() ? '' : '') + '" style="' + (r.player === myName() ? 'color:var(--gold);font-weight:700' : '') + '">' + r.player + '</td>'
+          + '<td>' + resBadge(r.result) + '</td><td>' + r.score + '</td><td>' + r.cpu + '</td>'
+          + '<td style="color:var(--sub);font-size:12px">' + r.created_at + '</td></tr>';
+      }
+      recentBody.innerHTML = html + '</table>';
+    }
+  } catch (e) {
+    recentBody.innerHTML = '<div class="offline">연결 없음</div>';
+  }
+}
+load();
+setInterval(load, 8000); // 8초마다 자동 갱신
+</script>
+</body>
+</html>

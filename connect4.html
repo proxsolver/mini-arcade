@@ -108,7 +108,7 @@
     <button class="cpu" data-cpu="m4">🧠 M4 Max<small>2026 · 깊이 8</small></button>
   </div>
   <div class="status" id="status">당신 차례 — 열을 클릭하거나 숫자키 1~7로 돌을 놓으세요</div>
-  <div style="margin-top:10px;text-align:center"><a href="index.html" style="color:var(--sub);font-size:13px;text-decoration:none;border-bottom:1px solid #454c68">← 게임 로비로</a></div>
+  <div style="margin-top:10px;text-align:center"><a href="index.html" style="color:var(--sub);font-size:13px;text-decoration:none;border-bottom:1px solid #454c68">← 게임 로비로</a> · <a href="leaderboard.html" style="color:var(--sub);font-size:13px;text-decoration:none;border-bottom:1px solid #454c68">🏆 리더보드</a></div>
   <footer>미니맥스 + 알파베타 가지치기 · CPU 등급 = 탐색 깊이 · vanilla JS 단일 파일 — 생성·실행·검증 ZCode</footer>
 
   <div class="modal" id="ruleModal">
@@ -271,6 +271,10 @@ function setStatus(html) { statusEl.innerHTML = html; }
 
 function endMatch(winner, line) {
   matchOver = true; locked = true;
+  try {
+    const myMoves = winner === 'hu' ? humanGame.info().moves : 99;
+    LB.submit('connect4', winner === 'draw' ? 'draw' : winner === 'hu' ? 'win' : 'lose', myMoves, CPUS[currentCpu].name);
+  } catch (e) {}
   if (line) for (const [r, c] of line) holes[r * COLS + c].classList.add('win');
   if (winner === 'draw') {
     overlay.textContent = '🤝 무승부';
@@ -350,6 +354,7 @@ window.addEventListener('keydown', e => {
 
 newMatch();
 </script>
+<script src="lb-client.js"></script>
 <script>
 // 규칙 모달
 const ruleModal = document.getElementById('ruleModal');

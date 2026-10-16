@@ -109,7 +109,7 @@
     <button class="cpu" data-cpu="m4">🧠 M4 Max<small>정보 이득 극대화</small></button>
   </div>
   <div class="status" id="status">먼저 당신의 비밀번호를 설정하세요</div>
-  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <div class="back"><a href="index.html">← 게임 로비로</a> · <a href="leaderboard.html">🏆 리더보드</a></div>
   <footer>제품별 연산력 = 후보 소거 능력 · vanilla JS — 생성·실행·검증 ZCode</footer>
 
   <div class="modal" id="ruleModal">
@@ -125,6 +125,7 @@
   </div>
 </div>
 
+<script src="lb-client.js"></script>
 <script>
 const CPUS = {
   mw: { name: '🍲 전자레인지',  spec: '700 W · 완전 랜덤 추측', tier: 0 },
@@ -225,6 +226,7 @@ function aiTurn() {
 }
 function finish(winner, num) {
   over = true; started = false;
+  try { LB.submit('baseball', winner === 'hu' ? 'win' : winner === 'draw' ? 'draw' : 'lose', turnCount, CPUS[currentCpu].name); } catch (e) {}
   if (winner === 'draw') {
     resultBox.textContent = '🤝 무승부 — 같은 ' + turnCount + '시도에 동시 정답! (AI 비밀번호: ' + aiSecret + ')';
     resultBox.className = 'overlaybox show draw';

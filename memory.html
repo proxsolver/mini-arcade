@@ -117,7 +117,7 @@
     <button class="cpu" data-cpu="m4">🧠 M4 Max<small>2026 · 기억 16장</small></button>
   </div>
   <div class="status" id="status">새 대국 — 카드를 클릭해 짝을 찾으세요 (당신 선공)</div>
-  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <div class="back"><a href="index.html">← 게임 로비로</a> · <a href="leaderboard.html">🏆 리더보드</a></div>
   <footer>CPU 등급 = AI의 기억력(RAM) · vanilla JS 단일 파일 — 생성·실행·검증 ZCode</footer>
 
   <div class="modal" id="ruleModal">
@@ -134,6 +134,7 @@
   </div>
 </div>
 
+<script src="lb-client.js"></script>
 <script>
 // ─── 상태 ───────────────────────────────────────────────
 const EMOJIS = ['🍎','🍌','🍇','🍓','🍒','🥑','🍑','🍍'];
@@ -204,6 +205,7 @@ function renderScores() {
 function allMatched() { return matched.every(Boolean); }
 function endMatch() {
   over = true; locked = true;
+  try { LB.submit('memory', huPairs > aiPairs ? 'win' : huPairs < aiPairs ? 'lose' : 'draw', huPairs, CPUS[currentCpu].name); } catch (e) {}
   setDots();
   if (huPairs > aiPairs) {
     overlay.textContent = '🏆 ' + huPairs + ' : ' + aiPairs + ' — 당신 승리!';

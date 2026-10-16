@@ -117,7 +117,7 @@
     <button class="cpu" data-cpu="m4">🧠 M4 Max<small>2026 · 깊이 5</small></button>
   </div>
   <div class="status" id="status">당신 차례 — 파란 점이 있는 칸을 클릭하세요</div>
-  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <div class="back"><a href="index.html">← 게임 로비로</a> · <a href="leaderboard.html">🏆 리더보드</a></div>
   <footer>미니맥스 + 알파베타 + 코너/기동력 가중 평가 · vanilla JS 단일 파일 — 생성·실행·검증 ZCode</footer>
 
   <div class="modal" id="ruleModal">
@@ -299,6 +299,7 @@ function setStatus(html) { statusEl.innerHTML = html; }
 function endMatch() {
   over = true; locked = true;
   const { b, w } = counts(grid);
+  try { LB.submit('othello', b > w ? 'win' : b < w ? 'lose' : 'draw', b, CPUS[currentCpu].name); } catch (e) {}
   if (b > w) {
     overlay.textContent = '⚫ ' + b + ' : ' + w + ' — 당신 승리!';
     overlay.className = 'overlay win';
@@ -376,6 +377,7 @@ document.getElementById('newMatch').addEventListener('click', newMatch);
 
 newMatch();
 </script>
+<script src="lb-client.js"></script>
 <script>
 // 규칙 모달
 const ruleModal = document.getElementById('ruleModal');

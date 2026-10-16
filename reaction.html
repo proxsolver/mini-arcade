@@ -98,7 +98,7 @@
     <button class="cpu" data-cpu="m4">🧠 M4 Max<small>반응 90ms</small></button>
   </div>
   <div class="status" id="status">램프를 클릭하면 라운드가 시작됩니다 — 먼저 <b>5점</b>!</div>
-  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <div class="back"><a href="index.html">← 게임 로비로</a> · <a href="leaderboard.html">🏆 리더보드</a></div>
   <footer>제품별 연산력 = 신호 처리 반응속도 · vanilla JS — 생성·실행·검증 ZCode</footer>
 
   <div class="modal" id="ruleModal">
@@ -114,6 +114,7 @@
   </div>
 </div>
 
+<script src="lb-client.js"></script>
 <script>
 const CPUS = {
   mw: { name: '🍲 전자레인지',  spec: '700 W · 반응 900ms', ms: 900 },
@@ -132,6 +133,7 @@ const logEl = document.getElementById('log'), statusEl = document.getElementById
 let huPts = 0, aiPts = 0, over = false;
 let state = 'idle'; // idle | wait | go | done
 let goTime = 0, timer1 = null, timer2 = null;
+let reactTimes = [];
 
 function setStatus(html) { statusEl.innerHTML = html; }
 function clearTimers() { if (timer1) clearTimeout(timer1); if (timer2) clearTimeout(timer2); }
@@ -174,6 +176,10 @@ function settle(aiWon, huReact) {
   }
   if (huPts >= 5 || aiPts >= 5) {
     over = true;
+    try {
+      const avg = reactTimes.length ? Math.round(reactTimes.reduce((a, b) => a + b, 0) / reactTimes.length) : 999;
+      LB.submit('reaction', huPts >= 5 ? 'win' : 'lose', avg, CPUS[currentCpu].name);
+    } catch (e) {}
     lamp.className = 'ready';
     lampBig.textContent = huPts >= 5 ? '🏆 당신 승리!' : '🤖 AI 승리';
     lampSmall.textContent = '클릭해서 새 대결';
@@ -196,6 +202,10 @@ lamp.addEventListener('click', () => {
     aiPts++; document.getElementById('aiPts').textContent = aiPts;
     if (aiPts >= 5) {
       over = true;
+      try {
+        const avg = reactTimes.length ? Math.round(reactTimes.reduce((a, b) => a + b, 0) / reactTimes.length) : 999;
+        LB.submit('reaction', 'lose', avg, CPUS[currentCpu].name);
+      } catch (e) {}
       setStatus('<b>' + CPUS[currentCpu].name + ' 승리</b> — 초조함이 패배를 불렀습니다');
       lampBig.textContent = '🤖 AI 승리';
       state = 'idle';
@@ -204,6 +214,7 @@ lamp.addEventListener('click', () => {
     setTimeout(() => { if (!over) { state = 'idle'; lamp.className = 'ready'; lampBig.textContent = '클릭해서 다음 라운드'; lampSmall.textContent = '이번엔 참으세요'; } }, 1400);
   } else if (state === 'go') {
     const react = performance.now() - goTime;
+    reactTimes.push(react);
     huMsEl.textContent = Math.round(react) + 'ms';
     const aiReact = CPUS[currentCpu].ms * (0.8 + Math.random() * 0.5);
     aiMsEl.textContent = Math.round(aiReact) + 'ms';
@@ -214,6 +225,7 @@ lamp.addEventListener('click', () => {
 });
 document.getElementById('newMatch').addEventListener('click', () => {
   clearTimers(); huPts = 0; aiPts = 0; over = false; state = 'idle';
+  reactTimes = [];
   document.getElementById('huPts').textContent = 0;
   document.getElementById('aiPts').textContent = 0;
   aiMsEl.textContent = '—'; aiMsEl.className = 'ms';

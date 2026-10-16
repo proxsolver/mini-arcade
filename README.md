@@ -22,17 +22,28 @@
 
 ## 실행 방법
 
-의존성이 전혀 없습니다. 아무 방법이나 쓰세요:
+### 리더보드(DB) 포함 — 권장
 
 ```bash
-# 방법 1: 로컬 서버
-python3 -m http.server 8137
-# → http://localhost:8137/
-
-# 방법 2: 그냥 index.html을 브라우저로 열기
+python3 server.py          # 표준 라이브러리만 사용 (설치 불필요)
+# → http://127.0.0.1:8137/
 ```
 
-`index.html`이 로비입니다. 각 게임 하단의 "← 게임 로비로"로 언제든 복귀할 수 있고, "📖 규칙" 버튼으로 게임별 설명을 볼 수 있습니다.
+게임 결과가 SQLite(`arcade.db`)에 기록되고 `leaderboard.html`에서 게임별 랭킹·최근 대국·통계를 볼 수 있습니다 (8초 자동 갱신).
+
+- `POST /api/score` — 대국 결과 기록 `{game, player, cpu, result, score}`
+- `GET /api/leaderboard` — 기록 조회 (`?game=` 필터)
+- `GET /api/stats` — 총 대국/승리/플레이어 수
+
+### DB 없이 정적 파일만
+
+```bash
+python3 -m http.server 8137   # 또는 index.html을 브라우저로 열기
+```
+
+게임은 정상 작동하지만 리더보드에 "DB 서버에 연결할 수 없습니다" 안내가 표시됩니다.
+
+`index.html`이 로비입니다. 각 게임 하단의 "← 게임 로비로"로 복귀, "🏆 리더보드"로 기록 확인이 가능합니다.
 
 ## 기술 특징
 

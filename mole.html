@@ -95,7 +95,7 @@
     <button class="cpu" data-cpu="m4">🧠 M4 Max<small>명중 97%</small></button>
   </div>
   <div class="status" id="status">시작 버튼을 누르면 20초 대결이 시작됩니다</div>
-  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <div class="back"><a href="index.html">← 게임 로비로</a> · <a href="leaderboard.html">🏆 리더보드</a></div>
   <footer>제품별 연산력 = 명중률과 반응속도 · vanilla JS — 생성·실행·검증 ZCode</footer>
 
   <div class="modal" id="ruleModal">
@@ -111,6 +111,7 @@
   </div>
 </div>
 
+<script src="lb-client.js"></script>
 <script>
 const CPUS = {
   mw: { name: '🍲 전자레인지',  spec: '700 W · 명중 25% · 반응 900ms', acc: 0.25, ms: 900 },
@@ -190,6 +191,7 @@ function endGame() {
   moleToken++;
   for (const h of holes) h.className = 'hole';
   timerEl.innerHTML = '종료!';
+  try { LB.submit('mole', huPts > aiPts ? 'win' : huPts < aiPts ? 'lose' : 'draw', huPts, CPUS[currentCpu].name); } catch (e) {}
   if (huPts > aiPts) {
     overlay.textContent = '🏆 ' + huPts + ' : ' + aiPts + ' — 당신 승리!';
     overlay.className = 'overlay win';

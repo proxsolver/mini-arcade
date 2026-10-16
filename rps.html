@@ -100,7 +100,7 @@
   </div>
   <div class="status" id="status">연승 대결 — 먼저 <b>5승</b>하는 쪽이 승리합니다</div>
   <div class="history" id="history"></div>
-  <div class="back"><a href="index.html">← 게임 로비로</a></div>
+  <div class="back"><a href="index.html">← 게임 로비로</a> · <a href="leaderboard.html">🏆 리더보드</a></div>
   <footer>제품별 연산력 = 패턴 예측력 · vanilla JS — 생성·실행·검증 ZCode</footer>
 
   <div class="modal" id="ruleModal">
@@ -115,6 +115,7 @@
   </div>
 </div>
 
+<script src="lb-client.js"></script>
 <script>
 const MOVES = ['✌️', '✊', '🖐️'];
 const NAMES = ['가위', '바위', '보'];
@@ -186,6 +187,7 @@ function throwMove(m) {
       }
       if (huPts >= 5 || aiPts >= 5) {
         over = true;
+        try { LB.submit('rps', huPts >= 5 ? 'win' : 'lose', huPts - aiPts, CPUS[currentCpu].name); } catch (e) {}
         resultEl.textContent = huPts >= 5 ? '🏆 당신 승리! ' + huPts + ' : ' + aiPts : '🤖 AI 승리 ' + aiPts + ' : ' + huPts;
         resultEl.className = huPts >= 5 ? 'result win' : 'result lose';
         document.getElementById('status').innerHTML = huPts >= 5

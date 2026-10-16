@@ -128,7 +128,7 @@
     <button class="cpu" data-cpu="m4">🧠 M4 Max<small>2026 · 깊이 5</small></button>
   </div>
   <div class="status" id="status">방향키(← ↑ ↓ →) 또는 오른쪽 화살표 버튼을 누르면 대결이 시작됩니다</div>
-  <div style="margin-top:10px;text-align:center"><a href="index.html" style="color:var(--sub);font-size:13px;text-decoration:none;border-bottom:1px solid #454c68">← 게임 로비로</a></div>
+  <div style="margin-top:10px;text-align:center"><a href="index.html" style="color:var(--sub);font-size:13px;text-decoration:none;border-bottom:1px solid #454c68">← 게임 로비로</a> · <a href="leaderboard.html" style="color:var(--sub);font-size:13px;text-decoration:none;border-bottom:1px solid #454c68">🏆 리더보드</a></div>
   <footer>같은 시드 · CPU 등급 = 수 속도 + 사고 깊이(휴리스틱 단계) · vanilla JS 단일 파일 — 생성·실행·검증 ZCode</footer>
 
   <div class="modal" id="ruleModal">
@@ -386,6 +386,7 @@ function onEnd(side, result) {
   finished = true;
   stopAiTimer();
   const winner = result.type === 'won' ? side : (side === 'ai' ? 'human' : 'ai');
+  try { LB.submit('battle', winner === 'human' ? 'win' : 'lose', result.score, CPUS[currentCpu].name); } catch (e) {}
   const how = result.type === 'won' ? '먼저 <b>2048 달성</b>' : '상대 <b>게임오버</b>';
   if (winner === 'ai') {
     aiOverlay.textContent = '🏆 승리!';
@@ -459,6 +460,7 @@ document.querySelectorAll('.cpu').forEach(b =>
 
 newMatch();
 </script>
+<script src="lb-client.js"></script>
 <script>
 // 규칙 모달
 const ruleModal = document.getElementById('ruleModal');
